@@ -68,7 +68,11 @@ exports.purchaseTickets = async (req, res) => {
             metadata: { userId: req.user.id, eventId }
         });
 
-        res.json({ clientSecret: paymentIntent.client_secret, totalAmount });
+        res.json({
+            paymentIntentId: paymentIntent.id, // Send this to client
+            clientSecret: paymentIntent.client_secret,
+            totalAmount
+        });
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');
@@ -77,10 +81,20 @@ exports.purchaseTickets = async (req, res) => {
 
 // @desc    Confirm payment and create order
 // @route   POST /api/tickets/confirm
+// controllers/ticketController.js
 exports.confirmPayment = async (req, res) => {
     const { paymentIntentId, eventId, tickets } = req.body;
+    // Extract ID if client secret was passed
+    if (paymentIntentId.includes('_secret_')) {
+        paymentIntentId = paymentIntentId.split('_secret_')[0];
+    }
 
     try {
+        // Validate input
+        if (!paymentIntentId || !eventId || !tickets || !tickets.length) {
+            return res.status(400).json({ msg: 'Missing required fields' });
+        }
+
         // Verify payment
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
@@ -88,12 +102,35 @@ exports.confirmPayment = async (req, res) => {
             return res.status(400).json({ msg: 'Payment not completed' });
         }
 
+        // Validate tickets and get current prices
+        let totalAmount = 0;
+        const validatedTickets = [];
+
+        for (const item of tickets) {
+            const ticket = await Ticket.findById(item.ticketId);
+            if (!ticket) {
+                return res.status(404).json({ msg: `Ticket not found: ${item.ticketId}` });
+            }
+
+            if (ticket.event.toString() !== eventId) {
+                return res.status(400).json({ msg: 'Ticket does not belong to this event' });
+            }
+
+            validatedTickets.push({
+                ticketType: item.ticketId,
+                quantity: item.quantity,
+                price: ticket.price
+            });
+
+            totalAmount += ticket.price * item.quantity;
+        }
+
         // Create order
         const order = new Order({
             user: req.user.id,
             event: eventId,
-            tickets,
-            totalAmount: paymentIntent.amount / 100,
+            tickets: validatedTickets,
+            totalAmount,
             paymentStatus: 'completed',
             paymentMethod: paymentIntent.payment_method_types[0],
             transactionId: paymentIntent.id
@@ -108,12 +145,10 @@ exports.confirmPayment = async (req, res) => {
             });
         }
 
-        // TODO: Send confirmation email
-
         res.json(order);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server error');
+        console.error('Payment Confirmation Error:', err);
+        res.status(500).send('Server error: ' + err.message);
     }
 };
 
@@ -126,6 +161,16 @@ exports.getUserOrders = async (req, res) => {
             .populate('tickets.ticketId', 'name type');
 
         res.json(orders);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.getTicketsByEvent = async (req, res) => {
+    try {
+        const tickets = await Ticket.find({ event: req.params.eventId });
+        res.json(tickets);
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');

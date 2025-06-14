@@ -107,10 +107,23 @@ exports.deleteEvent = async (req, res) => {
             return res.status(401).json({ msg: 'Not authorized' });
         }
 
-        await event.remove();
+        // Use deleteOne() instead of remove()
+        await Event.deleteOne({ _id: req.params.id });
+
         res.json({ msg: 'Event removed' });
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');
+    }
+};
+
+
+exports.getEvents = async (req, res) => {
+    try {
+        const events = await Event.find({ status: 'published' })
+            .populate('organizer', 'name email'); // Populate organizer details
+        res.json(events);
+    } catch (error) {
+        // ... error handling ...
     }
 };

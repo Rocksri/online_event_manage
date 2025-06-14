@@ -25,8 +25,41 @@ const app = express();
 // Connect to database
 connectDB();
 
+// CORS Configuration
+const corsOptions = {
+    origin: (origin, callback) => {
+        const allowedOrigins = [
+            'http://localhost:5173',
+            'http://127.0.0.1:5173',
+            // Add your production domains here when ready:
+            // 'https://your-production-domain.com'
+        ];
+
+        // Allow requests with no origin (like mobile apps, curl requests)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            console.error(`CORS blocked for origin: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token'],
+    credentials: true,
+    optionsSuccessStatus: 200
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions)); // Apply CORS middleware
+app.use((err, req, res, next) => {
+    if (err.message === 'Not allowed by CORS') {
+        res.status(403).json({
+            error: 'CORS policy blocked this request'
+        });
+    } else {
+        next(err);
+    }
+});
 app.use(express.json());
 swaggerSetup(app);
 
