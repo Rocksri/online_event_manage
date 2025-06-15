@@ -21,6 +21,7 @@ const scheduleRoutes = require('./routes/scheduleRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const userRoutes = require('./routes/userRoutes'); // Your new user routes file
 
+
 const app = express();
 
 // Connect to database

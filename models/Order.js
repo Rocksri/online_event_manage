@@ -1,33 +1,19 @@
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
-    user: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
-    event: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Event',
-        required: true
-    },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    event: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
     tickets: [{
-        ticketType: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Ticket'
-        },
-        quantity: Number,
-        price: Number
+        ticketId: { type: mongoose.Schema.Types.ObjectId, ref: 'Ticket', required: true },
+        quantity: { type: Number, required: true }
     }],
     totalAmount: { type: Number, required: true },
-    paymentStatus: {
-        type: String,
-        enum: ['pending', 'completed', 'failed', 'refunded'],
-        default: 'pending'
-    },
+    paymentStatus: { type: String, enum: ['pending', 'completed', 'failed'], default: 'pending' },
     paymentMethod: String,
-    transactionId: String,
-    createdAt: { type: Date, default: Date.now }
+    transactionId: String
+}, {
+    timestamps: true,
+    strictPopulate: false // Add this option
 });
 
 module.exports = mongoose.model('Order', orderSchema);

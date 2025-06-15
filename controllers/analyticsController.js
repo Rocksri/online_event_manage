@@ -1,6 +1,7 @@
 const Order = require('../models/Order');
 const Event = require('../models/Event');
 const Ticket = require('../models/Ticket');
+const User = require('../models/User');
 
 // @desc    Get event analytics
 // @route   GET /api/analytics/events/:eventId
@@ -72,6 +73,98 @@ exports.getOrganizerAnalytics = async (req, res) => {
             totalRevenue,
             totalAttendees,
             avgRevenuePerEvent: totalRevenue / totalEvents || 0
+        });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+};
+
+
+// @desc    Get admin analytics
+// @route   GET /api/analytics/admin
+exports.getAdminAnalytics = async (req, res) => {
+    try {
+        const { range } = req.query;
+        const rangeMap = {
+            week: 7,
+            month: 30,
+            year: 365
+        };
+        const days = rangeMap[range] || 30;
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+
+        // Fetch all necessary data in parallel
+        const [totalEvents, totalRevenue, totalUsers, eventsOverTime, revenueOverTime, topCategories, userRoles] = await Promise.all([
+            Event.countDocuments(),
+            Order.aggregate([
+                { $match: { paymentStatus: 'completed' } },
+                { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+            ]),
+            User.countDocuments(),
+            Event.aggregate([
+                { $match: { createdAt: { $gte: startDate } } },
+                {
+                    $group: {
+                        _id: {
+                            $dateToString: {
+                                format: range === 'week' ? "%Y-%U" : range === 'year' ? "%Y" : "%Y-%m",
+                                date: "$createdAt"
+                            }
+                        },
+                        count: { $sum: 1 }
+                    }
+                },
+                { $sort: { _id: 1 } },
+                { $project: { period: "$_id", count: 1, _id: 0 } }
+            ]),
+            Order.aggregate([
+                { $match: { paymentStatus: 'completed', createdAt: { $gte: startDate } } },
+                {
+                    $group: {
+                        _id: {
+                            $dateToString: {
+                                format: range === 'week' ? "%Y-%U" : range === 'year' ? "%Y" : "%Y-%m",
+                                date: "$createdAt"
+                            }
+                        },
+                        amount: { $sum: "$totalAmount" }
+                    }
+                },
+                { $sort: { _id: 1 } },
+                { $project: { period: "$_id", amount: 1, _id: 0 } }
+            ]),
+            Event.aggregate([
+                { $group: { _id: "$category", count: { $sum: 1 } } },
+                { $sort: { count: -1 } },
+                { $limit: 5 }
+            ]),
+            User.aggregate([
+                { $group: { _id: "$role", count: { $sum: 1 } } }
+            ])
+        ]);
+
+        // Process user roles
+        const roleCounts = {
+            attendeeCount: 0,
+            organizerCount: 0,
+            adminCount: 0
+        };
+        userRoles.forEach(role => {
+            if (role._id === 'attendee') roleCounts.attendeeCount = role.count;
+            if (role._id === 'organizer') roleCounts.organizerCount = role.count;
+            if (role._id === 'admin') roleCounts.adminCount = role.count;
+        });
+
+        res.json({
+            totalEvents,
+            totalRevenue: totalRevenue[0]?.total || 0,
+            totalUsers,
+            eventsOverTime,
+            revenueOverTime,
+            topCategories,
+            ...roleCounts
         });
     } catch (err) {
         console.error(err.message);

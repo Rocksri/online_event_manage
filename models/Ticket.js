@@ -8,7 +8,7 @@ const TicketSchema = new mongoose.Schema({
         required: true
     },
     name: { type: String, required: true },
-    type: { type: String, enum: ['general', 'vip', 'early-bird'], default: 'general' },
+    type: { type: String, default: 'general' },
     price: { type: Number, required: true, min: 0 },
     quantity: { type: Number, required: true, min: 0 },
     sold: { type: Number, default: 0 },

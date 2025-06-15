@@ -1,10 +1,12 @@
+// models/Schedule.js
 const mongoose = require('mongoose');
 
 const scheduleSchema = new mongoose.Schema({
     event: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Event',
-        required: true
+        required: true,
+        unique: true // Ensure only one schedule per event
     },
     sessions: [{
         title: { type: String, required: true },

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const analyticsController = require('../controllers/analyticsController');
+const adminAuth = require('../middleware/adminAuth')
 
 /**
  * @swagger
@@ -105,5 +106,74 @@ router.get('/events/:eventId', auth, analyticsController.getEventAnalytics);
  *         description: Unauthorized
  */
 router.get('/organizer', auth, analyticsController.getOrganizerAnalytics);
+
+/**
+ * @swagger
+ * /analytics/admin:
+ *   get:
+ *     summary: Get admin analytics
+ *     tags: [Analytics]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: range
+ *         schema:
+ *           type: string
+ *           enum: [week, month, year]
+ *         description: Time range for analytics
+ *     responses:
+ *       200:
+ *         description: Admin analytics data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalEvents:
+ *                   type: integer
+ *                 totalRevenue:
+ *                   type: number
+ *                 totalUsers:
+ *                   type: integer
+ *                 eventsOverTime:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       period:
+ *                         type: string
+ *                       count:
+ *                         type: integer
+ *                 revenueOverTime:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       period:
+ *                         type: string
+ *                       amount:
+ *                         type: number
+ *                 topCategories:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                       count:
+ *                         type: integer
+ *                 attendeeCount:
+ *                   type: integer
+ *                 organizerCount:
+ *                   type: integer
+ *                 adminCount:
+ *                   type: integer
+ *       403:
+ *         description: Forbidden (admin only)
+ *       500:
+ *         description: Server error
+ */
+router.get('/admin', auth, adminAuth, analyticsController.getAdminAnalytics);
 
 module.exports = router;

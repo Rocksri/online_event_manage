@@ -1,7 +1,9 @@
+// ticketController.js
 const Ticket = require('../models/Ticket');
 const Order = require('../models/Order');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const Event = require('../models/Event');  // Add this import
+const Event = require('../models/Event');
+const mongoose = require('mongoose');
 
 // @desc    Create ticket type
 // @route   POST /api/tickets
@@ -33,101 +35,151 @@ exports.createTicket = async (req, res) => {
     }
 };
 
-// @desc    Purchase tickets
+// @desc    Initiate ticket purchase (create payment intent)
 // @route   POST /api/tickets/purchase
 exports.purchaseTickets = async (req, res) => {
     const { eventId, tickets } = req.body;
 
     try {
-        // Validate ticket availability
-        let totalAmount = 0;
-        const ticketItems = [];
-
-        for (const item of tickets) {
-            const ticket = await Ticket.findById(item.ticketId);
-            if (!ticket || ticket.event.toString() !== eventId) {
-                return res.status(400).json({ msg: 'Invalid ticket selection' });
-            }
-
-            if (ticket.quantity - ticket.sold < item.quantity) {
-                return res.status(400).json({ msg: `Not enough ${ticket.name} tickets available` });
-            }
-
-            totalAmount += ticket.price * item.quantity;
-            ticketItems.push({
-                ticketId: ticket._id,
-                quantity: item.quantity,
-                price: ticket.price
-            });
+        // Basic validation for eventId and tickets array
+        if (!mongoose.Types.ObjectId.isValid(eventId)) {
+            return res.status(400).json({ msg: 'Invalid Event ID format.' });
+        }
+        if (!tickets || !Array.isArray(tickets) || tickets.length === 0) {
+            return res.status(400).json({ msg: 'Tickets array is required and cannot be empty.' });
         }
 
-        // Create Stripe payment intent
+        // Fetch all ticket types for the event to validate against available quantity and calculate total
+        const eventTicketTypes = await Ticket.find({ event: eventId });
+        const ticketTypeMap = new Map(eventTicketTypes.map(t => [t._id.toString(), t]));
+
+        let totalAmount = 0;
+
+        for (const item of tickets) {
+            const { ticketId, quantity } = item;
+
+            if (!mongoose.Types.ObjectId.isValid(ticketId) || quantity <= 0) {
+                return res.status(400).json({ msg: 'Invalid ticket ID or quantity provided.' });
+            }
+
+            const ticket = ticketTypeMap.get(ticketId);
+
+            if (!ticket) {
+                return res.status(404).json({ msg: `Ticket type with ID ${ticketId} not found for this event.` });
+            }
+
+            // Check if enough tickets are available for purchase (pre-check)
+            if (ticket.sold + quantity > ticket.quantity) {
+                return res.status(400).json({ msg: `Not enough tickets available for ${ticket.name}. Only ${ticket.quantity - ticket.sold} left.` });
+            }
+
+            totalAmount += ticket.price * quantity;
+        }
+
+        // Create Stripe Payment Intent
         const paymentIntent = await stripe.paymentIntents.create({
-            amount: totalAmount * 100, // in cents
+            amount: Math.round(totalAmount * 100), // amount in cents
             currency: 'usd',
-            metadata: { userId: req.user.id, eventId }
+            payment_method_types: ['card'],
         });
 
         res.json({
-            paymentIntentId: paymentIntent.id, // Send this to client
             clientSecret: paymentIntent.client_secret,
+            paymentIntentId: paymentIntent.id, // Add this
             totalAmount
         });
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server error');
+        console.error('Payment Intent Creation Error:', err);
+        res.status(500).send('Server error: ' + err.message);
     }
 };
 
 // @desc    Confirm payment and create order
 // @route   POST /api/tickets/confirm
-// controllers/ticketController.js
 exports.confirmPayment = async (req, res) => {
     const { paymentIntentId, eventId, tickets } = req.body;
-    // Extract ID if client secret was passed
-    if (paymentIntentId.includes('_secret_')) {
-        paymentIntentId = paymentIntentId.split('_secret_')[0];
-    }
 
     try {
-        // Validate input
-        if (!paymentIntentId || !eventId || !tickets || !tickets.length) {
-            return res.status(400).json({ msg: 'Missing required fields' });
-        }
-
-        // Verify payment
+        // Retrieve and confirm the payment intent from Stripe
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        console.log("Retrieved Payment Intent:", paymentIntent.id, paymentIntent.status);
 
         if (paymentIntent.status !== 'succeeded') {
-            return res.status(400).json({ msg: 'Payment not completed' });
+            return res.status(400).json({ msg: 'Payment not successful. Current status: ' + paymentIntent.status });
         }
 
-        // Validate tickets and get current prices
+        // Basic validation for eventId and tickets array
+        if (!mongoose.Types.ObjectId.isValid(eventId)) {
+            return res.status(400).json({ msg: 'Invalid Event ID format.' });
+        }
+        if (!tickets || !Array.isArray(tickets) || tickets.length === 0) {
+            return res.status(400).json({ msg: 'Tickets array is required and cannot be empty.' });
+        }
+
+        // Fetch all ticket types for the event to validate against available quantity
+        const eventTicketTypes = await Ticket.find({ event: eventId });
+        const ticketTypeMap = new Map(eventTicketTypes.map(t => [t._id.toString(), t]));
+
         let totalAmount = 0;
         const validatedTickets = [];
 
         for (const item of tickets) {
-            const ticket = await Ticket.findById(item.ticketId);
+            const { ticketId, quantity } = item;
+
+            if (!mongoose.Types.ObjectId.isValid(ticketId) || quantity <= 0) {
+                throw new Error('Invalid ticket ID or quantity provided.');
+            }
+
+            const ticket = ticketTypeMap.get(ticketId);
+
             if (!ticket) {
-                return res.status(404).json({ msg: `Ticket not found: ${item.ticketId}` });
+                throw new Error(`Ticket type with ID ${ticketId} not found for this event.`);
             }
 
-            if (ticket.event.toString() !== eventId) {
-                return res.status(400).json({ msg: 'Ticket does not belong to this event' });
+            // Perform the server-side check before attempting atomic update
+            if (ticket.sold + quantity > ticket.quantity) {
+                throw new Error(`Not enough tickets available for ${ticket.name}. Only ${ticket.quantity - ticket.sold} left.`);
             }
 
-            validatedTickets.push({
-                ticketType: item.ticketId,
-                quantity: item.quantity,
-                price: ticket.price
-            });
-
-            totalAmount += ticket.price * item.quantity;
+            totalAmount += ticket.price * quantity;
+            validatedTickets.push({ ticketId: ticket._id, quantity });
         }
 
-        // Create order
+        // Iterate through validatedTickets to atomically update sold count for each
+        for (const item of validatedTickets) {
+            const { ticketId, quantity } = item;
+
+            // Atomically update the 'sold' count, ensuring we don't oversell.
+            // The $expr operator allows for using aggregation expressions in the query portion,
+            // which enables comparison of fields within the same document.
+            const updatedTicket = await Ticket.findOneAndUpdate(
+                {
+                    _id: ticketId,
+                    // Condition: (total quantity - currently sold) >= quantity to purchase
+                    $expr: {
+                        $gte: [
+                            { $subtract: ["$quantity", "$sold"] }, // Remaining tickets
+                            quantity // Quantity to purchase
+                        ]
+                    }
+                },
+                {
+                    $inc: { sold: quantity } // Increment sold tickets
+                },
+                { new: true } // Return the updated document
+            );
+
+            if (!updatedTicket) {
+                // If updatedTicket is null, it means no document matched the query criteria.
+                // This typically happens if the ticketId is wrong or if there weren't enough tickets
+                // available when the atomic update was attempted (due to a race condition).
+                throw new Error(`Failed to update ticket count for ticket type ${ticketTypeMap.get(ticketId)?.name || ticketId}. It might be sold out or not found due to concurrent purchases.`);
+            }
+        }
+
+        // Create order after successful payment and ticket quantity update
         const order = new Order({
-            user: req.user.id,
+            user: req.user.id, // Assuming req.user is populated by authentication middleware
             event: eventId,
             tickets: validatedTickets,
             totalAmount,
@@ -138,16 +190,13 @@ exports.confirmPayment = async (req, res) => {
 
         await order.save();
 
-        // Update ticket quantities
-        for (const item of tickets) {
-            await Ticket.findByIdAndUpdate(item.ticketId, {
-                $inc: { sold: item.quantity }
-            });
-        }
-
         res.json(order);
     } catch (err) {
         console.error('Payment Confirmation Error:', err);
+        // Provide more specific error messages to the frontend
+        if (err.message.includes('Not enough tickets available') || err.message.includes('sold out') || err.message.includes('concurrent purchases')) {
+            return res.status(400).json({ msg: err.message });
+        }
         res.status(500).send('Server error: ' + err.message);
     }
 };
@@ -158,7 +207,11 @@ exports.getUserOrders = async (req, res) => {
     try {
         const orders = await Order.find({ user: req.user.id })
             .populate('event', 'title date')
-            .populate('tickets.ticketId', 'name type');
+            .populate({
+                path: 'tickets.ticketId',
+                model: 'Ticket',
+                select: 'name type price' // Add price to selection
+            });
 
         res.json(orders);
     } catch (err) {
@@ -167,10 +220,53 @@ exports.getUserOrders = async (req, res) => {
     }
 };
 
+
+// @desc    Get tickets by event ID
+// @route   GET /api/tickets/event/:eventId
 exports.getTicketsByEvent = async (req, res) => {
     try {
-        const tickets = await Ticket.find({ event: req.params.eventId });
+        const { eventId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(eventId)) {
+            return res.status(400).json({ message: 'Invalid Event ID format.' });
+        }
+        const tickets = await Ticket.find({ event: eventId });
         res.json(tickets);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+};
+
+
+exports.cancelTicket = async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const { ticketIndex } = req.body;
+
+        const order = await Order.findById(orderId);
+        if (!order) return res.status(404).json({ msg: 'Order not found' });
+
+        if (ticketIndex >= order.tickets.length) {
+            return res.status(400).json({ msg: 'Invalid ticket index' });
+        }
+
+        const ticket = order.tickets[ticketIndex];
+        // Update ticket quantity in Ticket model
+        await Ticket.findByIdAndUpdate(ticket.ticketId, {
+            $inc: { sold: -ticket.quantity }
+        });
+
+        // Remove ticket from order
+        order.tickets.splice(ticketIndex, 1);
+
+        // If no tickets left, cancel entire order
+        if (order.tickets.length === 0) {
+            await order.deleteOne();
+        } else {
+            await order.save();
+        }
+
+        res.json({ msg: 'Ticket cancelled successfully' });
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');

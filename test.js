@@ -1,234 +1,171 @@
-const mongoose = require('mongoose');
+// ticketController.js
+const Ticket = require('../models/Ticket');
+const Order = require('../models/Order');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Event = require('../models/Event');
-const User = require('../models/User');
-const Ticket = require('../models/Ticket'); // Keep this line as you're deleting tickets
+const mongoose = require('mongoose');
 
-// @desc    Create new event
-// @route   POST /api/events
-exports.createEvent = async (req, res) => {
-    const { title, description, date, time, location, category, images, videos } = req.body;
-
-    try {
-        const newEvent = new Event({
-            title,
-            description,
-            date,
-            time,
-            location,
-            category,
-            images,
-            videos,
-            organizer: req.user.id
-        });
-
-        const event = await newEvent.save();
-        res.json(event);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server error');
-    }
-};
-
-// @desc    Get all events
-// @route   GET /api/events
-
-exports.getEvents = async (req, res) => {
-    const { category, eventID, location, dateFrom, dateTo, minPrice, maxPrice, search } = req.query;
+// @desc    Create ticket type
+// @route   POST /api/tickets
+exports.createTicket = async (req, res) => {
+    const { event, name, type, price, quantity, validFrom, validUntil } = req.body;
 
     try {
-        let pipeline = [
-            // Changed to 'published' as it's common for 'Get all events' public API.
-            // Revert to 'draft' if you specifically need draft events here.
-            // Also, consider adding 'published' to the default view for the main event list.
-            { $match: { status: { $in: ['published'] } } } // Default to published for general events list
-        ];
-
-        // IMPORTANT FIX: Convert eventID string to ObjectId
-        if (eventID) {
-            // Validate if eventID is a valid MongoDB ObjectId format
-            if (!mongoose.Types.ObjectId.isValid(eventID)) {
-                return res.status(400).json({ message: 'Invalid Event ID format' });
-            }
-            pipeline.push({ $match: { _id: new mongoose.Types.ObjectId(eventID) } });
-        }
-
-        if (category) {
-            pipeline.push({ $match: { category: category } });
-        }
-        // if (eventID) { // This block is now redundant and moved above with the fix
-        //     pipeline.push({ $match: { _id: eventID } });
-        // }
-        if (location) {
-            pipeline.push({ $match: { 'location.city': { $regex: location, $options: 'i' } } }); // Added regex for flexible city search
-        }
-        if (dateFrom && dateTo) {
-            // Ensure dates are parsed correctly. For precise range, consider time part.
-            pipeline.push({ $match: { date: { $gte: new Date(dateFrom), $lte: new Date(dateTo) } } });
-        } else if (dateFrom) { // Allow search from a specific date onwards
-            pipeline.push({ $match: { date: { $gte: new Date(dateFrom) } } });
-        } else if (dateTo) { // Allow search up to a specific date
-            pipeline.push({ $match: { date: { $lte: new Date(dateTo) } } });
-        }
-        if (search) {
-            pipeline.push({ $match: { title: { $regex: search, $options: 'i' } } });
-        }
-
-        // Add $lookup to join with tickets
-        // Note: If you have `ticketTypes` directly embedded in your Event schema,
-        // you might not need this $lookup for price filtering, and instead
-        // iterate over the embedded array. But if tickets are a separate collection, this is correct.
-        pipeline.push({
-            $lookup: {
-                from: 'tickets', // The collection name for Ticket model (usually lowercase and plural)
-                localField: '_id',
-                foreignField: 'event',
-                as: 'ticketTypes'
-            }
-        });
-
-        // Add price filtering after joining tickets
-        if (minPrice || maxPrice) {
-            let priceMatchConditions = {};
-            if (minPrice) {
-                priceMatchConditions.$gte = parseFloat(minPrice);
-            }
-            if (maxPrice) {
-                priceMatchConditions.$lte = parseFloat(maxPrice);
-            }
-
-            // Using $elemMatch to find events where at least one ticket type matches the price criteria
-            pipeline.push({
-                $match: {
-                    'ticketTypes.price': priceMatchConditions // This is still matching the array directly, which works for simple ranges.
-                    // For more complex 'at least one ticket meets criteria', $elemMatch might be safer.
-                    // Let's improve this for robustness:
-                }
-            });
-            // Improved price filtering to ensure at least one ticket type matches
-            pipeline.push({
-                $match: {
-                    'ticketTypes': {
-                        $elemMatch: priceMatchConditions
-                    }
-                }
-            });
-        }
-
-
-        // Populate organizer after all filtering
-        pipeline.push({
-            $lookup: {
-                from: 'users', // The collection name for User model (assuming 'users')
-                localField: 'organizer',
-                foreignField: '_id',
-                as: 'organizer'
-            }
-        });
-
-        // Unwind the organizer array from $lookup (since it's a one-to-one relationship)
-        pipeline.push({
-            $unwind: {
-                path: '$organizer',
-                preserveNullAndEmptyArrays: true // Keep events even if organizer not found
-            }
-        });
-
-        // Project to select only necessary organizer fields
-        pipeline.push({
-            $project: {
-                title: 1,
-                description: 1,
-                date: 1,
-                time: 1,
-                location: 1,
-                capacity: 1, // Make sure 'capacity' is actually on your Event model if you're using it
-                category: 1,
-                images: 1,
-                videos: 1,
-                status: 1,
-                createdAt: 1,
-                'organizer._id': 1, // Include organizer _id for frontend checks
-                'organizer.name': 1, // Select specific fields from organizer
-                ticketTypes: 1 // Keep ticketTypes for further processing if needed, or remove if not.
-            }
-        });
-
-        let events = await Event.aggregate(pipeline);
-
-        res.json(events);
-    } catch (err) {
-        console.error("Error in getEvents:", err.message); // More descriptive logging
-        // If the error is due to an invalid ObjectId format that bypassed initial check (less likely now)
-        if (err.name === 'CastError' && err.path === '_id') {
-            return res.status(400).json({ message: 'Invalid event ID provided.' });
-        }
-        res.status(500).send('Server error');
-    }
-};
-
-// @desc    Update event
-// @route   PUT /api/events/:id
-exports.updateEvent = async (req, res) => {
-    const { title, description, date, time, location, category, images, videos, status } = req.body;
-
-    try {
-        let event = await Event.findById(req.params.id);
-
-        if (!event) {
-            return res.status(404).json({ msg: 'Event not found' });
-        }
-
-        // Check if user is organizer or admin
-        if (event.organizer.toString() !== req.user.id && req.user.role !== 'admin') {
+        // Verify event belongs to organizer
+        const eventObj = await Event.findById(event);
+        if (!eventObj || eventObj.organizer.toString() !== req.user.id) {
             return res.status(401).json({ msg: 'Not authorized' });
         }
 
-        event = await Event.findByIdAndUpdate(
-            req.params.id,
-            { $set: { title, description, date, time, location, category, images, videos, status } },
-            { new: true }
-        );
+        const newTicket = new Ticket({
+            event,
+            name,
+            type,
+            price,
+            quantity,
+            validFrom,
+            validUntil
+        });
 
-        res.json(event);
+        const ticket = await newTicket.save();
+        res.json(ticket);
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');
     }
 };
 
-// @desc    Delete event
-// @route   DELETE /api/events/:id
-exports.deleteEvent = async (req, res) => {
+// @desc    Purchase tickets
+// @route   POST /api/tickets/purchase
+exports.purchaseTickets = async (req, res) => {
+    const { eventId, tickets } = req.body;
+
     try {
-        const event = await Event.findById(req.params.id);
-        console.log(event)
-
-        if (!event) {
-            return res.status(404).json({ msg: 'Event not found' });
+        // Basic validation for eventId and tickets array
+        if (!mongoose.Types.ObjectId.isValid(eventId)) {
+            return res.status(400).json({ msg: 'Invalid Event ID format.' });
+        }
+        if (!tickets || !Array.isArray(tickets) || tickets.length === 0) {
+            return res.status(400).json({ msg: 'Tickets array is required and cannot be empty.' });
         }
 
-        // Check if user is organizer or admin
-        if (event.organizer.toString() !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ msg: 'Not authorized' });
+        // Fetch all ticket types for the event to validate against available quantity and calculate total
+        const eventTicketTypes = await Ticket.find({ event: eventId });
+        const ticketTypeMap = new Map(eventTicketTypes.map(t => [t._id.toString(), t]));
+
+        let totalAmount = 0;
+        const validatedTickets = [];
+
+        for (const item of tickets) {
+            const { ticketId, quantity } = item;
+
+            if (!mongoose.Types.ObjectId.isValid(ticketId) || quantity <= 0) {
+                throw new Error('Invalid ticket ID or quantity provided.');
+            }
+
+            const ticket = ticketTypeMap.get(ticketId);
+
+            if (!ticket) {
+                throw new Error(`Ticket type with ID ${ticketId} not found for this event.`);
+            }
+
+            // Client-side check (can still be raced but provides immediate feedback)
+            if (ticket.sold + quantity > ticket.quantity) {
+                throw new Error(`Not enough tickets available for ${ticket.name}. Only ${ticket.quantity - ticket.sold} left.`);
+            }
+
+            totalAmount += ticket.price * quantity;
+            validatedTickets.push({ ticketId: ticket._id, quantity });
         }
 
-        // Delete all related data
-        await Promise.all([
-            Ticket.deleteMany({ event: event._id }),
-            // Removed Order.deleteMany as you don't have the model
-            // Removed Schedule.deleteOne as you don't have the model
-            Event.deleteOne({ _id: event._id })
-        ]);
+        // --- Stripe Payment Intent Creation (Removed for brevity, assuming successful payment) ---
+        // const paymentIntent = await stripe.paymentIntents.create({
+        //     amount: Math.round(totalAmount * 100), // amount in cents
+        //     currency: 'usd',
+        //     payment_method_types: ['card'],
+        // });
 
-        res.json({ msg: 'Event removed' });
+        // Iterate through validatedTickets to atomically update sold count for each
+        for (const item of validatedTickets) {
+            const { ticketId, quantity } = item;
+
+            // Atomically update the 'sold' count, ensuring we don't oversell.
+            // The $expr operator allows for using aggregation expressions in the query portion,
+            // which enables comparison of fields within the same document.
+            const updatedTicket = await Ticket.findOneAndUpdate(
+                {
+                    _id: ticketId,
+                    // Condition: (total quantity - currently sold) >= quantity to purchase
+                    $expr: {
+                        $gte: [
+                            { $subtract: ["$quantity", "$sold"] }, // Remaining tickets
+                            quantity // Quantity to purchase
+                        ]
+                    }
+                },
+                {
+                    $inc: { sold: quantity } // Increment sold tickets
+                },
+                { new: true } // Return the updated document
+            );
+
+            if (!updatedTicket) {
+                // If updatedTicket is null, it means no document matched the query criteria.
+                // This typically happens if the ticketId is wrong or if there weren't enough tickets
+                // available when the atomic update was attempted (due to a race condition).
+                throw new Error(`Failed to update ticket count for ticket type ${ticketTypeMap.get(ticketId)?.name || ticketId}. It might be sold out or not found.`);
+            }
+        }
+
+        // Create order (Assuming payment was successful)
+        const order = new Order({
+            user: req.user.id, // Assuming req.user is populated by authentication middleware
+            event: eventId,
+            tickets: validatedTickets,
+            totalAmount,
+            paymentStatus: 'completed',
+            // paymentMethod: paymentIntent.payment_method_types[0], // Uncomment if using Stripe
+            // transactionId: paymentIntent.id // Uncomment if using Stripe
+        });
+
+        await order.save();
+
+        res.json(order);
     } catch (err) {
-        console.error('Delete Event Error:', err.message);
-
-        // Handle specific errors
-        if (err.name === 'CastError') {
-            return res.status(400).json({ msg: 'Invalid event ID' });
+        console.error('Purchase Tickets Error:', err);
+        // Provide more specific error messages to the frontend
+        if (err.message.includes('Not enough tickets available') || err.message.includes('sold out')) {
+            return res.status(400).json({ msg: err.message });
         }
-
         res.status(500).send('Server error: ' + err.message);
+    }
+};
+
+// @desc    Get user orders
+// @route   GET /api/tickets/orders
+exports.getUserOrders = async (req, res) => {
+    try {
+        const orders = await Order.find({ user: req.user.id })
+            .populate('event', 'title date')
+            .populate('tickets.ticketId', 'name type');
+
+        res.json(orders);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+};
+
+exports.getTicketsByEvent = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(eventId)) {
+            return res.status(400).json({ message: 'Invalid Event ID format.' });
+        }
+        const tickets = await Ticket.find({ event: eventId });
+        res.json(tickets);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
     }
 };

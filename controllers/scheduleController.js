@@ -31,12 +31,15 @@ exports.updateSchedule = async (req, res) => {
             }
         }
 
-        // Verify event exists and user is authorized
+        // Verify event exists and user is authorized (assuming req.user from auth middleware)
         const eventObj = await Event.findById(event);
         if (!eventObj) {
             return res.status(404).json({ msg: 'Event not found' });
         }
 
+        // IMPORTANT: Ensure you have an authentication middleware that populates req.user.
+        // And that req.user.id holds the user's ID and req.user.role holds their role.
+        // The user must be the event organizer or an admin to update the schedule.
         if (eventObj.organizer.toString() !== req.user.id && req.user.role !== 'admin') {
             return res.status(403).json({ msg: 'Not authorized to modify this event' });
         }
@@ -45,15 +48,17 @@ exports.updateSchedule = async (req, res) => {
         let schedule = await Schedule.findOne({ event });
 
         if (schedule) {
+            // Update existing schedule
             schedule.sessions = sessions;
             schedule.lastUpdated = Date.now();
         } else {
+            // Create new schedule if not found
             schedule = new Schedule({ event, sessions });
         }
 
         await schedule.save();
 
-        res.json(schedule);
+        res.json(schedule); // Return the saved/updated schedule
     } catch (err) {
         console.error('Schedule Error:', err);
         res.status(500).send('Server error: ' + err.message);
@@ -62,19 +67,27 @@ exports.updateSchedule = async (req, res) => {
 
 exports.getSchedule = async (req, res) => {
     try {
-        if (!mongoose.Types.ObjectId.isValid(req.params.eventId)) {
+        const { eventId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(eventId)) {
             return res.status(400).json({ msg: 'Invalid Event ID format' });
         }
 
-        const schedule = await Schedule.findOne({ event: req.params.eventId });
+        // Find the schedule for the given event ID
+        let schedule = await Schedule.findOne({ event: eventId });
 
         if (!schedule) {
-            return res.status(404).json({ msg: 'Schedule not found' });
+            // If no schedule is found, return a default empty schedule object with 200 OK.
+            // This tells the frontend that no schedule exists yet, allowing it to prompt creation.
+            return res.status(200).json({
+                event: eventId,
+                sessions: []
+            });
         }
 
         res.json(schedule);
     } catch (err) {
-        console.error('Get Schedule Error:', err);
-        res.status(500).send('Server error: ' + err.message);
+        console.error(err.message);
+        res.status(500).send('Server error');
     }
 };

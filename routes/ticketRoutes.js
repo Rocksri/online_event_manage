@@ -176,4 +176,39 @@ router.get('/orders', auth, ticketController.getUserOrders);
 
 router.get('/event/:eventId', ticketController.getTicketsByEvent);
 
+/**
+ * @swagger
+ * /tickets/orders/{orderId}/cancel-ticket:
+ *   put:
+ *     summary: Cancel a ticket
+ *     tags: [Tickets]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the order
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ticketIndex:
+ *                 type: integer
+ *                 description: Index of the ticket in the order's tickets array
+ *     responses:
+ *       200:
+ *         description: Ticket cancelled successfully
+ *       400:
+ *         description: Bad request
+ *       404:
+ *         description: Order not found
+ */
+router.put('/orders/:orderId/cancel-ticket', auth, ticketController.cancelTicket);
+
 module.exports = router;

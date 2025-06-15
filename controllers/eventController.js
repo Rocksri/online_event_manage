@@ -37,7 +37,7 @@ exports.getEvents = async (req, res) => {
 
     try {
         let pipeline = [
-            { $match: { status: { $in: ['draft'] } } } // Original status filter
+            { $match: { status: { $in: ['draft', 'published', 'cancelled'] } } } // Original status filter
         ];
 
         if (category) {
