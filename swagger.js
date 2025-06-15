@@ -15,8 +15,7 @@ const options = {
             { url: 'http://localhost:5000/api', description: 'Development server' },
             { url: 'https://api.eventplatform.com/v1', description: 'Production server' },
         ],
-        components: schemas.components,
-        security: schemas.security
+        security: [{ BearerAuth: [] }]
     },
     apis: ['./routes/*.js'], // Path to all route files
 };

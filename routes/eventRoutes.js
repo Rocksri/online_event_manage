@@ -97,6 +97,36 @@ router.post('/', auth, eventController.createEvent);
  */
 router.get('/', eventController.getEvents);
 
+/**
+
+* @swagger
+* /api/events/{id}:
+*   get:
+*     summary: Get event by ID
+*     tags: [Events]
+*     description: Retrieve an event by its ID, with organizer and ticketTypes populated.
+*     parameters:
+*       - in: path
+*         name: id
+*         required: true
+*         description: MongoDB ObjectId of the event.
+*         schema:
+*           type: string
+*     responses:
+*       200:
+*         description: The event data.
+*         content:
+*           application/json:
+*             schema:
+*               $ref: '#/components/schemas/Event'
+*       400:
+*         description: Invalid event ID format.
+*       404:
+*         description: Event not found.
+*       500:
+*         description: Server error.
+
+*/
 router.get('/:id', eventController.getEventById);
 
 /**

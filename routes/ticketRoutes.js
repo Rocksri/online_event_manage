@@ -173,7 +173,34 @@ router.post('/confirm', auth, ticketController.confirmPayment);
  */
 router.get('/orders', auth, ticketController.getUserOrders);
 
-
+/**
+* @swagger
+* /api/tickets/event/{eventId}:
+*   get:
+*     summary: Get tickets by event ID
+*     tags: [Tickets]
+*     description: Retrieve a list of tickets for a specific event.
+*     parameters:
+*       - in: path
+*         name: eventId
+*         required: true
+*         description: MongoDB ObjectId of the event.
+*         schema:
+*           type: string
+*     responses:
+*       200:
+*         description: A list of tickets.
+*         content:
+*           application/json:
+*             schema:
+*               type: array
+*               items:
+*                 $ref: '#/components/schemas/Ticket'
+*       400:
+*         description: Invalid Event ID format.
+*       500:
+*         description: Server error.
+*/
 router.get('/event/:eventId', ticketController.getTicketsByEvent);
 
 /**
