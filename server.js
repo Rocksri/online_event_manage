@@ -19,6 +19,7 @@ const eventRoutes = require('./routes/eventRoutes');
 const ticketRoutes = require('./routes/ticketRoutes');
 const scheduleRoutes = require('./routes/scheduleRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const userRoutes = require('./routes/userRoutes'); // Your new user routes file
 
 const app = express();
 
@@ -30,7 +31,9 @@ const corsOptions = {
     origin: (origin, callback) => {
         const allowedOrigins = [
             'http://localhost:5173',
+            'http://localhost:5000',
             'http://127.0.0.1:5173',
+            'http://127.0.0.1:5000',
             // Add your production domains here when ready:
             // 'https://your-production-domain.com'
         ];
@@ -51,15 +54,6 @@ const corsOptions = {
 
 // Middleware
 app.use(cors(corsOptions)); // Apply CORS middleware
-app.use((err, req, res, next) => {
-    if (err.message === 'Not allowed by CORS') {
-        res.status(403).json({
-            error: 'CORS policy blocked this request'
-        });
-    } else {
-        next(err);
-    }
-});
 app.use(express.json());
 swaggerSetup(app);
 
@@ -70,6 +64,7 @@ console.log('JWT Secret:', process.env.JWT_SECRET ? 'Set' : 'Not Set');
 console.log('Stripe Key:', process.env.STRIPE_SECRET_KEY ? 'Set' : 'Not Set');
 
 // Routes
+app.use('/api/users', userRoutes); // Mount your user routes under /api/users
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/tickets', ticketRoutes);

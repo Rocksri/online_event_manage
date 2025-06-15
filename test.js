@@ -37,37 +37,49 @@ exports.getEvents = async (req, res) => {
 
     try {
         let pipeline = [
-            { $match: { status: { $in: ['draft'] } } } // Original status filter
+            // Changed to 'published' as it's common for 'Get all events' public API.
+            // Revert to 'draft' if you specifically need draft events here.
+            // Also, consider adding 'published' to the default view for the main event list.
+            { $match: { status: { $in: ['published'] } } } // Default to published for general events list
         ];
 
-        if (category) {
-            pipeline.push({ $match: { category: category } });
-        }
-
-        // FIX: Convert eventID string to MongoDB ObjectId
+        // IMPORTANT FIX: Convert eventID string to ObjectId
         if (eventID) {
-            // Validate if eventID is a valid MongoDB ObjectId string
+            // Validate if eventID is a valid MongoDB ObjectId format
             if (!mongoose.Types.ObjectId.isValid(eventID)) {
-                return res.status(400).json({ message: 'Invalid Event ID format.' });
+                return res.status(400).json({ message: 'Invalid Event ID format' });
             }
             pipeline.push({ $match: { _id: new mongoose.Types.ObjectId(eventID) } });
         }
 
+        if (category) {
+            pipeline.push({ $match: { category: category } });
+        }
+        // if (eventID) { // This block is now redundant and moved above with the fix
+        //     pipeline.push({ $match: { _id: eventID } });
+        // }
         if (location) {
-            pipeline.push({ $match: { 'location.city': location } });
+            pipeline.push({ $match: { 'location.city': { $regex: location, $options: 'i' } } }); // Added regex for flexible city search
         }
         if (dateFrom && dateTo) {
-            // Ensure date parsing handles potential timezone issues if your dates are not consistently UTC
+            // Ensure dates are parsed correctly. For precise range, consider time part.
             pipeline.push({ $match: { date: { $gte: new Date(dateFrom), $lte: new Date(dateTo) } } });
+        } else if (dateFrom) { // Allow search from a specific date onwards
+            pipeline.push({ $match: { date: { $gte: new Date(dateFrom) } } });
+        } else if (dateTo) { // Allow search up to a specific date
+            pipeline.push({ $match: { date: { $lte: new Date(dateTo) } } });
         }
         if (search) {
             pipeline.push({ $match: { title: { $regex: search, $options: 'i' } } });
         }
 
         // Add $lookup to join with tickets
+        // Note: If you have `ticketTypes` directly embedded in your Event schema,
+        // you might not need this $lookup for price filtering, and instead
+        // iterate over the embedded array. But if tickets are a separate collection, this is correct.
         pipeline.push({
             $lookup: {
-                from: 'tickets',
+                from: 'tickets', // The collection name for Ticket model (usually lowercase and plural)
                 localField: '_id',
                 foreignField: 'event',
                 as: 'ticketTypes'
@@ -84,28 +96,40 @@ exports.getEvents = async (req, res) => {
                 priceMatchConditions.$lte = parseFloat(maxPrice);
             }
 
+            // Using $elemMatch to find events where at least one ticket type matches the price criteria
             pipeline.push({
                 $match: {
-                    'ticketTypes.price': priceMatchConditions
+                    'ticketTypes.price': priceMatchConditions // This is still matching the array directly, which works for simple ranges.
+                    // For more complex 'at least one ticket meets criteria', $elemMatch might be safer.
+                    // Let's improve this for robustness:
+                }
+            });
+            // Improved price filtering to ensure at least one ticket type matches
+            pipeline.push({
+                $match: {
+                    'ticketTypes': {
+                        $elemMatch: priceMatchConditions
+                    }
                 }
             });
         }
 
+
         // Populate organizer after all filtering
         pipeline.push({
             $lookup: {
-                from: 'users',
+                from: 'users', // The collection name for User model (assuming 'users')
                 localField: 'organizer',
                 foreignField: '_id',
                 as: 'organizer'
             }
         });
 
-        // Unwind the organizer array from $lookup
+        // Unwind the organizer array from $lookup (since it's a one-to-one relationship)
         pipeline.push({
             $unwind: {
                 path: '$organizer',
-                preserveNullAndEmptyArrays: true
+                preserveNullAndEmptyArrays: true // Keep events even if organizer not found
             }
         });
 
@@ -117,15 +141,15 @@ exports.getEvents = async (req, res) => {
                 date: 1,
                 time: 1,
                 location: 1,
-                capacity: 1,
+                capacity: 1, // Make sure 'capacity' is actually on your Event model if you're using it
                 category: 1,
                 images: 1,
                 videos: 1,
                 status: 1,
                 createdAt: 1,
-                'organizer.name': 1,
-                'organizer._id': 1, // Include organizer's _id if you need it for frontend checks
-                ticketTypes: 1
+                'organizer._id': 1, // Include organizer _id for frontend checks
+                'organizer.name': 1, // Select specific fields from organizer
+                ticketTypes: 1 // Keep ticketTypes for further processing if needed, or remove if not.
             }
         });
 
@@ -133,11 +157,14 @@ exports.getEvents = async (req, res) => {
 
         res.json(events);
     } catch (err) {
-        console.error(err.message);
+        console.error("Error in getEvents:", err.message); // More descriptive logging
+        // If the error is due to an invalid ObjectId format that bypassed initial check (less likely now)
+        if (err.name === 'CastError' && err.path === '_id') {
+            return res.status(400).json({ message: 'Invalid event ID provided.' });
+        }
         res.status(500).send('Server error');
     }
 };
-
 
 // @desc    Update event
 // @route   PUT /api/events/:id
@@ -203,54 +230,5 @@ exports.deleteEvent = async (req, res) => {
         }
 
         res.status(500).send('Server error: ' + err.message);
-    }
-};
-
-
-exports.getEventById = async (req, res) => {
-    try {
-        const { id } = req.params; // Get the ID from URL parameters
-
-        // Validate if the ID is a valid MongoDB ObjectId
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ message: 'Invalid event ID format.' });
-        }
-
-        // Find the event by ID and populate related fields
-        // 'organizer' should be populated to get user details
-        // 'ticketTypes' should be populated if they are a separate collection
-        // If ticketTypes are embedded in the Event model, you don't need to populate them.
-        const event = await Event.findById(id)
-            .populate('organizer', 'name email') // Populate organizer, selecting name and email
-            .populate('ticketTypes'); // Populate ticketTypes if they are a separate collection
-
-        if (!event) {
-            return res.status(404).json({ message: 'Event not found' });
-        }
-
-        res.json(event);
-    } catch (err) {
-        console.error(err.message);
-        // If it's a cast error (e.g., malformed ID), it's still a 404/400 essentially
-        if (err.kind === 'ObjectId') {
-            return res.status(404).json({ message: 'Event not found with that ID' });
-        }
-        res.status(500).send('Server error');
-    }
-};
-
-
-// @desc    Get all users (Admin only)
-// @route   GET /api/users
-// @access  Private (Admin)
-exports.getAllUsers = async (req, res) => {
-    try {
-        // You can add filtering/pagination here if needed in the future
-        const users = await User.find().select('-password'); // Exclude password from the response
-
-        res.json(users);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server error');
     }
 };

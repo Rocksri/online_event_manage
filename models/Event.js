@@ -25,7 +25,12 @@ const eventSchema = new mongoose.Schema({
         enum: ['draft', 'published', 'cancelled'],
         default: 'draft'
     },
+    ticketTypes: [{ // Array of ObjectIds referencing the Ticket model
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Ticket' // This must match the name of your Ticket model
+    }],
     createdAt: { type: Date, default: Date.now }
 });
+
 
 module.exports = mongoose.model('Event', eventSchema);

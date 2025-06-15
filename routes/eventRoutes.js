@@ -49,6 +49,11 @@ router.post('/', auth, eventController.createEvent);
  *           type: string
  *         description: Filter by category
  *       - in: query
+ *         name: eventID
+ *         schema:
+ *           type: string
+ *         description: Event ID
+ *       - in: query
  *         name: location
  *         schema:
  *           type: string
@@ -91,6 +96,8 @@ router.post('/', auth, eventController.createEvent);
  *                 $ref: '#/components/schemas/Event'
  */
 router.get('/', eventController.getEvents);
+
+router.get('/:id', eventController.getEventById);
 
 /**
  * @swagger
@@ -159,5 +166,7 @@ router.put('/:id', auth, eventController.updateEvent);
  *         description: Event not found
  */
 router.delete('/:id', auth, eventController.deleteEvent);
+
+
 
 module.exports = router;
