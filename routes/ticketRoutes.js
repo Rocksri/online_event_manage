@@ -130,6 +130,9 @@ router.post('/purchase', auth, ticketController.purchaseTickets);
  *               eventId:
  *                 type: string
  *                 example: 5f8d0d55b54764421b7156c4
+ *               billingDetails:
+ *                 type: string
+ *                 example: john@example.com
  *               tickets:
  *                 type: array
  *                 items:

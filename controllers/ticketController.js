@@ -4,6 +4,18 @@ const Order = require('../models/Order');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Event = require('../models/Event');
 const mongoose = require('mongoose');
+const nodemailer = require('nodemailer');
+const User = require('../models/User');
+
+// Configure email transporter
+console.log(process.env.EMAIL_USER, process.env.EMAIL_PASSWORD);
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
+    },
+});
 
 // @desc    Create ticket type
 // @route   POST /api/tickets
@@ -97,7 +109,9 @@ exports.purchaseTickets = async (req, res) => {
 // @desc    Confirm payment and create order
 // @route   POST /api/tickets/confirm
 exports.confirmPayment = async (req, res) => {
-    const { paymentIntentId, eventId, tickets } = req.body;
+    console.log(req)
+    const { paymentIntentId, eventId, tickets, billingDetails } = req.body;
+
 
     try {
         // Retrieve and confirm the payment intent from Stripe
@@ -190,6 +204,44 @@ exports.confirmPayment = async (req, res) => {
 
         await order.save();
 
+        try {
+            const user = await User.findById(req.user.id);
+            const event = await Event.findById(eventId);
+
+            const frontendBaseUrl = process.env.FRONTEND_URL || 'http://localhost:3000'; // Replace with your actual frontend URL in .env
+
+            if (billingDetails && billingDetails.email) { // Use billingDetails from req.body
+                const eventLink = `${frontendBaseUrl}/events/${event._id}`; // Construct the event link
+
+                const mailOptions = {
+                    from: `"EventHub" <${process.env.EMAIL_USER}>`,
+                    to: billingDetails.email, // Use billingDetails.email
+                    subject: `Your tickets for ${event.title} have been confirmed!`,
+                    html: `
+                    <h1>Thank you for your purchase!</h1>
+                    <p>Here are your ticket details:</p>
+                    <p><strong>Event:</strong> ${event.title}</p>
+                    <p><strong>Date:</strong> ${new Date(event.date).toLocaleString()}</p>
+                    <p><strong>Order ID:</strong> ${order._id}</p>
+                    <p><strong>Total:</strong> $${order.totalAmount.toFixed(2)}</p>
+                    <p>You can view your tickets in your dashboard.</p>
+                    <p><strong><a href="${eventLink}">View Event Details</a></strong></p>
+                    <p>Thank you for using EventHub!</p>
+                `,
+                };
+
+                transporter.sendMail(mailOptions, (error, info) => {
+                    if (error) {
+                        console.error('Error sending email:', error);
+                    } else {
+                        console.log('Email sent:', info.response);
+                    }
+                });
+            }
+        } catch (emailError) {
+            console.error('Email notification error:', emailError);
+        }
+
         res.json(order);
     } catch (err) {
         console.error('Payment Confirmation Error:', err);
@@ -272,3 +324,4 @@ exports.cancelTicket = async (req, res) => {
         res.status(500).send('Server error');
     }
 };
+
