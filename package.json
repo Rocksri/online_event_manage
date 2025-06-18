@@ -21,8 +21,10 @@
   },
   "homepage": "https://github.com/Rocksri/online_event_manage#readme",
   "dependencies": {
+    "axios": "^1.10.0",
     "bcryptjs": "^3.0.2",
     "body-parser": "^2.2.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "cros": "^1.1.0",
     "dotenv": "^16.5.0",

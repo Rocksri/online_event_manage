@@ -114,4 +114,9 @@ router.post('/login', authController.login);
  */
 router.get('/profile', auth, authController.getProfile);
 
+
+router.post('/logout', auth, authController.logout);
+
+
+
 module.exports = router;

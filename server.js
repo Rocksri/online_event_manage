@@ -1,5 +1,6 @@
 require('dotenv').config();
 const swaggerSetup = require('./swagger');
+const cookieParser = require('cookie-parser'); // Import cookie-parser
 
 
 // Validate critical environment variables
@@ -56,6 +57,7 @@ const corsOptions = {
 // Middleware
 app.use(cors(corsOptions)); // Apply CORS middleware
 app.use(express.json());
+app.use(cookieParser()); // Use cookie-parser middleware
 swaggerSetup(app);
 
 // Log environment status

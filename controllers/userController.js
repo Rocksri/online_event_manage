@@ -1,17 +1,114 @@
-// controllers/userController.js (create this file if it doesn't exist)
-const User = require('../models/User'); // Import your User model
+// controllers/userController.js
+const User = require('../models/User'); // Assuming you have a User model
 
-// @desc    Get all users (Admin only)
+// @desc    Get all users
 // @route   GET /api/users
-// @access  Private (Admin)
-exports.getAllUsers = async (req, res) => {
+// @access  Private/Admin
+exports.getUsers = async (req, res) => {
     try {
-        // You can add filtering/pagination here if needed in the future
-        const users = await User.find().select('-password'); // Exclude password from the response
-
+        // Fetch all users, but don't send their passwords
+        const users = await User.find().select('-password');
         res.json(users);
     } catch (err) {
         console.error(err.message);
+        res.status(500).send('Server error');
+    }
+};
+
+// @desc    Get user by ID (for profile management)
+// @route   GET /api/users/:id
+// @access  Private/Admin or User itself
+exports.getUserById = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).select('-password');
+        if (!user) {
+            return res.status(404).json({ msg: 'User not found' });
+        }
+
+        // Allow user to get their own profile, or admin to get any profile
+        if (user._id.toString() !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ msg: 'Not authorized to view this user profile' });
+        }
+
+        res.json(user);
+    } catch (err) {
+        console.error(err.message);
+        // Handle cast errors (invalid ID format)
+        if (err.kind === 'ObjectId') {
+            return res.status(400).json({ msg: 'Invalid user ID' });
+        }
+        res.status(500).send('Server error');
+    }
+};
+
+
+// @desc    Update user profile
+// @route   PUT /api/users/:id
+// @access  Private/Admin or User itself
+exports.updateUser = async (req, res) => {
+    const { name, email, role } = req.body; // Add other fields as needed
+
+    // Build user object
+    const userFields = {};
+    if (name) userFields.name = name;
+    if (email) userFields.email = email;
+    // Only allow admin to change roles
+    if (role && req.user.role === 'admin') {
+        userFields.role = role;
+    }
+
+    try {
+        let user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({ msg: 'User not found' });
+        }
+
+        // Ensure user is updating their own profile or is an admin
+        if (user._id.toString() !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ msg: 'Not authorized to update this user profile' });
+        }
+
+        user = await User.findByIdAndUpdate(
+            req.params.id,
+            { $set: userFields },
+            { new: true } // Return the updated document
+        ).select('-password'); // Don't send password back
+
+        res.json(user);
+    } catch (err) {
+        console.error(err.message);
+        if (err.kind === 'ObjectId') {
+            return res.status(400).json({ msg: 'Invalid user ID' });
+        }
+        res.status(500).send('Server error');
+    }
+};
+
+// @desc    Delete user
+// @route   DELETE /api/users/:id
+// @access  Private/Admin
+exports.deleteUser = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({ msg: 'User not found' });
+        }
+
+        // Prevent admin from deleting themselves if desired, or allow it
+        if (req.user.id === req.params.id && req.user.role === 'admin') {
+            // You might want to add more sophisticated checks here
+            // e.g., ensure there's at least one other admin before allowing self-deletion
+        }
+
+        await User.findByIdAndDelete(req.params.id);
+        res.json({ msg: 'User removed' });
+    } catch (err) {
+        console.error(err.message);
+        if (err.kind === 'ObjectId') {
+            return res.status(400).json({ msg: 'Invalid user ID' });
+        }
         res.status(500).send('Server error');
     }
 };
