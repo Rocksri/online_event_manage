@@ -1,5 +1,6 @@
 // controllers/userController.js
 const User = require('../models/User'); // Assuming you have a User model
+const bcrypt = require('bcryptjs'); // Needed for password hashing if we handle it here, but we will use authController
 
 // @desc    Get all users
 // @route   GET /api/users
@@ -33,7 +34,6 @@ exports.getUserById = async (req, res) => {
         res.json(user);
     } catch (err) {
         console.error(err.message);
-        // Handle cast errors (invalid ID format)
         if (err.kind === 'ObjectId') {
             return res.status(400).json({ msg: 'Invalid user ID' });
         }
@@ -41,21 +41,25 @@ exports.getUserById = async (req, res) => {
     }
 };
 
-
 // @desc    Update user profile
 // @route   PUT /api/users/:id
-// @access  Private/Admin or User itself
+// @access  Private/Admin or User themselves
 exports.updateUser = async (req, res) => {
-    const { name, email, role } = req.body; // Add other fields as needed
+    // Include new fields for update
+    const { name, email, address, dob, phone } = req.body;
 
     // Build user object
     const userFields = {};
     if (name) userFields.name = name;
-    if (email) userFields.email = email;
-    // Only allow admin to change roles
-    if (role && req.user.role === 'admin') {
-        userFields.role = role;
-    }
+    // Email is typically not changed via a simple profile update, but if allowed,
+    // ensure unique validation is handled at the model level or here.
+    // For now, we'll keep it as potentially updatable but comment on its sensitivity.
+    // if (email) userFields.email = email; // Be careful with email updates as they affect login.
+
+    if (address) userFields.address = address; // This will update the entire address object
+    if (dob) userFields.dob = dob;
+    if (phone) userFields.phone = phone;
+
 
     try {
         let user = await User.findById(req.params.id);
@@ -64,7 +68,7 @@ exports.updateUser = async (req, res) => {
             return res.status(404).json({ msg: 'User not found' });
         }
 
-        // Ensure user is updating their own profile or is an admin
+        // Ensure user is authorized to update: either their own profile or admin
         if (user._id.toString() !== req.user.id && req.user.role !== 'admin') {
             return res.status(403).json({ msg: 'Not authorized to update this user profile' });
         }
@@ -109,6 +113,6 @@ exports.deleteUser = async (req, res) => {
         if (err.kind === 'ObjectId') {
             return res.status(400).json({ msg: 'Invalid user ID' });
         }
-        res.status(500).send('Server error');
+        res.status(500).send('Server error: ' + err.message);
     }
 };

@@ -20,7 +20,8 @@ const setJwtCookie = (res, userId, userRole) => {
 // @desc    Register user
 // @route   POST /api/auth/register
 exports.register = async (req, res) => {
-    const { name, email, password, role } = req.body;
+    // Add new fields to destructuring
+    const { name, email, password, role, address, dob, phone } = req.body;
 
     try {
         let user = await User.findOne({ email });
@@ -28,7 +29,8 @@ exports.register = async (req, res) => {
             return res.status(400).json({ msg: "User already exists" });
         }
 
-        user = new User({ name, email, password, role });
+        // Include new fields when creating a new User
+        user = new User({ name, email, password, role, address, dob, phone });
 
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(password, salt);
@@ -38,7 +40,7 @@ exports.register = async (req, res) => {
         // Set JWT as an HTTP-only cookie
         setJwtCookie(res, user.id, user.role);
 
-        res.json({ msg: "Registration successful" }); // No need to send token in JSON response
+        res.status(201).json({ msg: "User registered successfully" });
     } catch (err) {
         console.error(err.message);
         res.status(500).send("Server error");
@@ -93,13 +95,46 @@ exports.logout = async (req, res) => {
 exports.getProfile = async (req, res) => {
     try {
         // req.user is set by the auth middleware if a valid token is present in cookies
-        const user = await User.findById(req.user.id).select("-password");
+        // Populate all necessary fields for the profile page
+        const user = await User.findById(req.user.id).select('-password');
         if (!user) {
-            return res.status(404).json({ msg: "User not found" });
+            return res.status(404).json({ msg: 'User not found' });
         }
         res.json(user);
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server error");
+        res.status(500).send('Server error');
+    }
+};
+
+// @desc    Update user password
+// @route   PUT /api/auth/password
+// @access  Private
+exports.updatePassword = async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+
+    try {
+        const user = await User.findById(req.user.id);
+
+        if (!user) {
+            return res.status(404).json({ msg: 'User not found' });
+        }
+
+        // Check current password
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ msg: 'Current password is incorrect' });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+
+        await user.save();
+
+        res.json({ msg: 'Password updated successfully' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
     }
 };
