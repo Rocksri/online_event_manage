@@ -263,7 +263,9 @@ exports.getUserOrders = async (req, res) => {
                 path: 'tickets.ticketId',
                 model: 'Ticket',
                 select: 'name type price' // Add price to selection
-            });
+
+            })
+            .sort({ createdAt: -1 });
 
         res.json(orders);
     } catch (err) {

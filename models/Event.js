@@ -13,7 +13,9 @@ const eventSchema = new mongoose.Schema({
     },
     capacity: Number,
     category: { type: String, required: true },
-    images: [String],
+    images: [{ // To store an array of URLs for event images
+        type: String
+    }],
     videos: [String],
     organizer: {
         type: mongoose.Schema.Types.ObjectId,

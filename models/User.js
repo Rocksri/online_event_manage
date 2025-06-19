@@ -16,7 +16,11 @@ const userSchema = new mongoose.Schema({
     },
     dob: { type: Date }, // New field
     phone: { type: String }, // New field
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    profileImage: {
+        type: String, // To store the URL of the profile image
+        default: null
+    }
 });
 
 module.exports = mongoose.model('User', userSchema);

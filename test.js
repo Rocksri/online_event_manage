@@ -1,105 +1,138 @@
-// controllers/authController.js
-const User = require("../models/User");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
+// controllers/userController.js
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
 
-// Helper function to generate and set JWT cookie
-const setJwtCookie = (res, userId, userRole) => {
-    const payload = { user: { id: userId, role: userRole } };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "5d" });
-
-    // Set the cookie
-    res.cookie('token', token, {
-        httpOnly: true, // Makes the cookie inaccessible to client-side JavaScript
-        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production (HTTPS)
-        sameSite: 'Lax', // Or 'Strict' for more security, 'None' if cross-domain (requires secure)
-        maxAge: 5 * 24 * 60 * 60 * 1000 // 5 days in milliseconds (matches JWT expiresIn)
-    });
-};
-
-// @desc    Register user
-// @route   POST /api/auth/register
-exports.register = async (req, res) => {
-    const { name, email, password, role } = req.body;
-
+// @desc    Get all users
+// @route   GET /api/users
+// @access  Private/Admin
+exports.getUsers = async (req, res) => {
     try {
-        let user = await User.findOne({ email });
-        if (user) {
-            return res.status(400).json({ msg: "User already exists" });
-        }
-
-        user = new User({ name, email, password, role });
-
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(password, salt);
-
-        await user.save();
-
-        // Set JWT as an HTTP-only cookie
-        setJwtCookie(res, user.id, user.role);
-
-        res.json({ msg: "Registration successful" }); // No need to send token in JSON response
+        const users = await User.find().select('-password');
+        res.json(users);
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server error");
+        res.status(500).send('Server error');
     }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
-exports.login = async (req, res) => {
-    const { email, password } = req.body;
-
+// @desc    Get user by ID (for profile management)
+// @route   GET /api/users/:id
+// @access  Private/Admin or User itself
+exports.getUserById = async (req, res) => {
     try {
-        const user = await User.findOne({ email });
+        const user = await User.findById(req.params.id).select('-password');
         if (!user) {
-            return res.status(400).json({ msg: "Invalid credentials" });
+            return res.status(404).json({ msg: 'User not found' });
         }
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ msg: "Invalid credentials" });
-        }
-
-        // Set JWT as an HTTP-only cookie
-        setJwtCookie(res, user.id, user.role);
-
-        res.json({ msg: "Logged in successfully" }); // No need to send token in JSON response
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Server error");
-    }
-};
-
-// @desc    Logout user
-// @route   POST /api/auth/logout
-exports.logout = async (req, res) => {
-    try {
-        // Clear the 'token' cookie
-        res.clearCookie('token', {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'Lax'
-        });
-        res.json({ msg: "Logged out successfully" });
-    } catch (err) {
-        console.error("Logout error:", err);
-        res.status(500).send("Server error");
-    }
-};
-
-// @desc    Get user profile
-// @route   GET /api/auth/profile
-exports.getProfile = async (req, res) => {
-    try {
-        // req.user is set by the auth middleware if a valid token is present in cookies
-        const user = await User.findById(req.user.id).select("-password");
-        if (!user) {
-            return res.status(404).json({ msg: "User not found" });
+        if (user._id.toString() !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ msg: 'Not authorized to view this user profile' });
         }
         res.json(user);
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server error");
+        if (err.kind === 'ObjectId') {
+            return res.status(400).json({ msg: 'Invalid user ID' });
+        }
+        res.status(500).send('Server error');
+    }
+};
+
+// @desc    Update user profile
+// @route   PUT /api/users/:id
+// @access  Private/Admin or User itself
+exports.updateUserProfile = async (req, res) => {
+    const { name, email, password, role, address, dob, phone } = req.body; // Destructure all possible fields
+
+    // Build userFields object
+    const userFields = {};
+    if (name) userFields.name = name;
+    if (email) userFields.email = email;
+    if (address) userFields.address = address; // Assuming address is an object or handled correctly
+    if (dob) userFields.dob = dob;
+    if (phone) userFields.phone = phone;
+
+    // Handle password update (only if provided and hashed) - typically done in authController or a dedicated route
+    if (password) {
+        // You would typically hash the password here before saving
+        // userFields.password = await bcrypt.hash(password, 10);
+        return res.status(400).json({ msg: 'Password updates should be done via a dedicated password change route.' });
+    }
+
+    // IMPORTANT: Handle role update ONLY if the requesting user is an admin
+    if (role && req.user && req.user.role === 'admin') {
+        // Validate the role value against allowed roles
+        const allowedRoles = ['attendee', 'organizer', 'admin'];
+        if (!allowedRoles.includes(role)) {
+            return res.status(400).json({ msg: 'Invalid role specified.' });
+        }
+        userFields.role = role;
+    } else if (role && req.user && req.user.role !== 'admin') {
+        // Prevent non-admin users from trying to change their role
+        return res.status(403).json({ msg: 'Not authorized to change user role.' });
+    }
+
+
+    try {
+        let user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({ msg: 'User not found' });
+        }
+
+        // Check if the requesting user is trying to update their own profile
+        // or if they are an admin updating another user's profile
+        if (user._id.toString() !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ msg: 'Not authorized to update this user profile' });
+        }
+
+        // Perform the update
+        user = await User.findByIdAndUpdate(
+            req.params.id,
+            { $set: userFields }, // Use $set to update only specified fields
+            { new: true, runValidators: true } // new: true returns the updated doc; runValidators ensures schema validation
+        ).select('-password'); // Exclude password from the returned document
+
+        res.json(user);
+    } catch (err) {
+        console.error(err.message);
+        if (err.kind === 'ObjectId') {
+            return res.status(400).json({ msg: 'Invalid user ID' });
+        }
+        // Handle potential validation errors from Mongoose
+        if (err.name === 'ValidationError') {
+            return res.status(400).json({ msg: err.message });
+        }
+        res.status(500).send('Server error');
+    }
+};
+
+// @desc    Delete user
+// @route   DELETE /api/users/:id
+// @access  Private/Admin
+exports.deleteUser = async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+
+        if (!user) {
+            return res.status(404).json({ msg: 'User not found' });
+        }
+
+        // Prevent admin from deleting themselves if desired, or allow it
+        if (req.user.id === req.params.id && req.user.role === 'admin') {
+            // You might want to add more sophisticated checks here
+            // e.g., ensure there's at least one other admin before allowing self-deletion
+            // For now, let's prevent self-deletion for simplicity
+            return res.status(403).json({ msg: 'Admins cannot delete their own account via this route.' });
+        }
+
+        await User.findByIdAndDelete(req.params.id);
+        res.json({ msg: 'User removed' });
+    } catch (err) {
+        console.error(err.message);
+        if (err.kind === 'ObjectId') {
+            return res.status(400).json({ msg: 'Invalid user ID' });
+        }
+        res.status(500).send('Server error');
     }
 };
