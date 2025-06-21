@@ -10,10 +10,10 @@ const setJwtCookie = (res, userId, userRole) => {
 
     // Set the cookie
     res.cookie('token', token, {
-        httpOnly: true, // Makes the cookie inaccessible to client-side JavaScript
-        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production (HTTPS)
-        sameSite: 'Lax', // Or 'Strict' for more security, 'None' if cross-domain (requires secure)
-        maxAge: 5 * 24 * 60 * 60 * 1000 // 5 days in milliseconds (matches JWT expiresIn)
+        httpOnly: true,
+        secure: true,            // Required for cross-site cookie on HTTPS
+        sameSite: 'None',        // Required for cross-site cookie
+        maxAge: 5 * 24 * 60 * 60 * 1000
     });
 };
 
