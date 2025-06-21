@@ -1,65 +1,92 @@
-# Online Event Management Platform – Frontend
+# Online Event Management Platform – Backend
 
-This is the frontend of the **Online Event Management Platform** built with **React.js** and **TailwindCSS**.
+This is the backend of the **Online Event Management Platform**, built using **Node.js**, **Express**, and **MongoDB**.
 
-## 🌐 Features
+## 🚀 Features
 
-- 🧾 Event Listings with filter, search, and media display
-- 🎟️ Ticket purchasing system with secure checkout
-- 🧍 Attendee registration and management
-- 📅 Event schedule view
-- 📈 Dashboard for users and organizers
-- 🛡️ Authentication and profile management
-- 🛠️ Admin panel for user/event control
-- 📬 Email confirmations
-- 💳 Payment integration (Stripe)
+- 📦 RESTful API for events, users, tickets, analytics
+- 🔐 JWT-based authentication (with cookie support)
+- 📧 Email notifications for confirmations and password resets
+- 🧾 Ticket generation & QR code support
+- 💳 Secure payment integration (Stripe or Razorpay)
+- 📊 Admin analytics for events and revenue
+- 🛠️ Support ticket system for attendees and organizers
+- 🖼️ Image upload support for profiles and events
+- 🧪 Swagger docs at `/api-docs`
 
 ## 🔧 Tech Stack
 
-- **React.js** with Vite
-- **TailwindCSS** for UI styling
-- **Axios** for API requests
-- **React Router v6**
-- **JWT Authentication (via Cookies)**
-- **Chart.js** or **Recharts** for analytics
+- **Node.js**, **Express**
+- **MongoDB** with **Mongoose**
+- **JWT** + **express-session** (if needed)
+- **Multer** + **Sharp** for image handling
+- **Swagger** for API docs
+- **nodemailer** for emails
+- **dotenv** for config management
 
 ## 📁 Folder Structure
 
-frontend/
-├── src/
-│ ├── components/
-│ ├── pages/
-│ ├── context/
-│ ├── services/
-│ └── App.jsx
-├── public/
-└── vite.config.js
+backend/
+├── controllers/
+├── models/
+├── routes/
+├── middleware/
+├── utils/
+├── uploads/
+└── server.js
 
-bash
+less
 Copy
 Edit
 
-## ⚙️ Environment Setup
+## 🧪 API Documentation
+
+- Swagger: [`/api-docs`](https://online-event-manage.onrender.com/api-docs/#/)
+
+## ⚙️ Environment Variables
 
 Create a `.env` file:
 
 ```env
-VITE_API_URL=https://your-backend-api.onrender.com
-🚀 Running the Frontend
+PORT=5000
+MONGO_URI=your-mongo-uri
+JWT_SECRET=your-secret
+FRONTEND_URL=https://your-frontend.netlify.app
+BACKEND_URL=https://your-backend.onrender.com
+EMAIL_USER=your_email@example.com
+EMAIL_PASS=your_app_password
+✅ Run Locally
 bash
 Copy
 Edit
-cd frontend
+cd backend
 npm install
 npm run dev
 🌍 Deployment
-Deploy using Netlify
+Deploy on Render
 
-Ensure VITE_API_URL points to the live backend
+Add the same .env variables in Render dashboard
 
-Add _redirects file to public/:
+Ensure correct CORS setup:
 
-bash
+js
 Copy
 Edit
-/*  /index.html  200
+app.use(cors({
+  origin: [process.env.FRONTEND_URL],
+  credentials: true,
+}));
+📦 API Routes Overview
+POST /auth/register – Register user
+
+POST /auth/login – Login and set cookie
+
+GET /auth/profile – Get logged-in user
+
+POST /events – Create new event (organizer)
+
+GET /events – List/search events
+
+POST /tickets/purchase – Purchase ticket
+
+GET /analytics/admin – View analytics (admin)
