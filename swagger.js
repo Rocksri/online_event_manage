@@ -2,6 +2,7 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const schemas = require('./schemas');
+require('dotenv').config();
 
 const options = {
     definition: {
@@ -12,8 +13,8 @@ const options = {
             description: 'API for managing events, tickets, schedules, and analytics',
         },
         servers: [
-            { url: 'http://localhost:5000/api', description: 'Development server' },
-            { url: 'https://api.eventplatform.com/v1', description: 'Production server' },
+            { url: process.env.FRONTEND_URL, description: 'Development server' },
+            { url: process.env.FRONTEND_URL, description: 'Production server' },
         ],
         security: [{ BearerAuth: [] }]
     },

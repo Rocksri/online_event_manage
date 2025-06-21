@@ -34,7 +34,7 @@ connectDB();
 // CORS Configuration
 const corsOptions = {
     origin: (origin, callback) => {
-        const allowedOrigins = [process.env.FRONTEND_URL, process.env.BACKEND_URL];
+        const allowedOrigins = [process.env.FRONTEND_URL, process.env.BACKEND_URL, 'https://eventifymanage.netlify.app/'];
 
         // Allow requests with no origin (like mobile apps, curl requests)
         if (!origin || allowedOrigins.includes(origin)) {
