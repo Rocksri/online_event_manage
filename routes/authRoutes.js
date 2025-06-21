@@ -38,7 +38,6 @@ const auth = require("../middleware/auth");
  *               role:
  *                 type: string
  *                 enum: [attendee, organizer, admin]
- *                 default: attendee
  *                 example: attendee
  *               address:
  *                 type: object
@@ -55,7 +54,7 @@ const auth = require("../middleware/auth");
  *                 example: 1990-01-01
  *               phone:
  *                 type: string
- *                 example: +15551234567
+ *                 example: +1234567890
  *     responses:
  *       201:
  *         description: User registered successfully
@@ -64,11 +63,14 @@ const auth = require("../middleware/auth");
  *             schema:
  *               type: object
  *               properties:
- *                 msg:
+ *                 success:
+ *                   type: boolean
+ *                 token:
  *                   type: string
- *                   example: User registered successfully
  *       400:
- *         description: User already exists or validation error
+ *         description: Bad request (e.g., user already exists)
+ *       500:
+ *         description: Server error
  */
 router.post("/register", authController.register);
 
@@ -96,17 +98,20 @@ router.post("/register", authController.register);
  *                 example: password123
  *     responses:
  *       200:
- *         description: Login successful
+ *         description: User logged in successfully
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 msg:
+ *                 success:
+ *                   type: boolean
+ *                 token:
  *                   type: string
- *                   example: Logged in successfully
  *       400:
  *         description: Invalid credentials
+ *       500:
+ *         description: Server error
  */
 router.post("/login", authController.login);
 
@@ -173,13 +178,52 @@ router.post("/logout", auth, authController.logout);
  *     responses:
  *       200:
  *         description: Password updated successfully
- *       400:
- *         description: Invalid current password or validation error
  *       401:
- *         description: Unauthorized
- *       404:
- *         description: User not found
+ *         description: Unauthorized or incorrect current password
+ *       500:
+ *         description: Server error
  */
 router.put("/password", auth, authController.updatePassword);
+
+
+
+// authRoutes.js - Add this new route
+/**
+ * @swagger
+ * /auth/generate-password:
+ *   post:
+ *     summary: Generate new password for user
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: user@example.com
+ *     responses:
+ *       200:
+ *         description: New password generated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 msg:
+ *                   type: string
+ *                 newPassword:
+ *                   type: string
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+router.post("/generate-password", authController.generatePassword);
+
 
 module.exports = router;

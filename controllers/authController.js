@@ -138,3 +138,43 @@ exports.updatePassword = async (req, res) => {
         res.status(500).send('Server error');
     }
 };
+
+
+
+// controllers/authController.js - Add this new function
+// @desc    Generate new password for user
+// @route   POST /api/auth/generate-password
+exports.generatePassword = async (req, res) => {
+    const { email } = req.body;
+
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ msg: "User not found" });
+        }
+
+        // Generate random password (8 characters)
+        const newPassword = Math.random().toString(36).slice(-8);
+
+        // Hash and save new password
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        await user.save();
+
+        // Return new password (in development only)
+        if (process.env.NODE_ENV === 'development') {
+            res.json({
+                msg: "Password updated successfully",
+                newPassword
+            });
+        } else {
+            // In production, we would send email here
+            res.json({
+                msg: "Password updated. Check your email for new password."
+            });
+        }
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send("Server error");
+    }
+};

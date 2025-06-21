@@ -1,6 +1,7 @@
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
+const User = require('../models/User'); // make sure this is imported at the top
 
 // Base directory for uploads (should match multer's destination)
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -16,29 +17,27 @@ exports.uploadProfileImage = async (req, res) => {
             return res.status(400).json({ msg: 'No file uploaded.' });
         }
 
-        // Path to the original uploaded file
         const originalFilePath = req.file.path;
-        // Desired output filename (e.g., profile-userId-timestamp.webp)
         const outputFileName = `profile-${req.user.id}-${Date.now()}.webp`;
         const outputPath = path.join(uploadsDir, 'profiles', outputFileName);
 
-        // Process image with sharp: resize, convert to webp, optimize
         await sharp(originalFilePath)
-            .resize(400, 400, { // Max 400x400 for profile images (adjust as needed)
+            .resize(400, 400, {
                 fit: sharp.fit.inside,
                 withoutEnlargement: true
             })
-            .webp({ quality: 80 }) // Convert to WebP for better performance
+            .webp({ quality: 80 })
             .toFile(outputPath);
 
-        // Delete the original uploaded file (Multer's temporary file)
         fs.unlink(originalFilePath, (err) => {
             if (err) console.error('Error deleting original file:', err);
         });
 
-        // Return the public URL for the image
-        // Adjust the base URL based on how your static files are served
         const imageUrl = `/uploads/profiles/${outputFileName}`;
+
+        // ✅ Update user record
+        await User.findByIdAndUpdate(req.user.id, { profileImage: imageUrl });
+
         res.json({ imageUrl });
 
     } catch (error) {

@@ -29,7 +29,7 @@ const auth = require('../middleware/auth');
  *               profileImage:
  *                 type: string
  *                 format: binary
- *                 description: Image file for the user's profile. Max 10MB.
+ *                 description: Image file for the user's profile. Max 20MB.
  *     responses:
  *       200:
  *         description: Profile image uploaded successfully
@@ -71,7 +71,7 @@ router.post('/profile', auth, upload.single('profileImage'), uploadProfileImage)
  *                 items:
  *                   type: string
  *                   format: binary
- *                 description: Array of image files for an event. Max 10MB per file, max 4K resolution.
+ *                 description: Array of image files for an event. Max 20MB per file, max 4K resolution.
  *     responses:
  *       200:
  *         description: Event images uploaded successfully

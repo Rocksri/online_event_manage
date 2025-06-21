@@ -34,14 +34,7 @@ connectDB();
 // CORS Configuration
 const corsOptions = {
     origin: (origin, callback) => {
-        const allowedOrigins = [
-            'http://localhost:5173',
-            'http://localhost:5000',
-            'http://127.0.0.1:5173',
-            'http://127.0.0.1:5000',
-            // Add your production domains here when ready:
-            // 'https://your-production-domain.com'
-        ];
+        const allowedOrigins = [process.env.FRONTEND_URL, process.env.BACKEND_URL];
 
         // Allow requests with no origin (like mobile apps, curl requests)
         if (!origin || allowedOrigins.includes(origin)) {
