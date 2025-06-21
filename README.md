@@ -1,7 +1,3 @@
-✅ 1. frontend/README.md
-md
-Copy
-Edit
 # Online Event Management Platform – Frontend
 
 This is the frontend of the **Online Event Management Platform** built with **React.js** and **TailwindCSS**.
