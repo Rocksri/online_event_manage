@@ -13,8 +13,10 @@ const options = {
             description: 'API for managing events, tickets, schedules, and analytics',
         },
         servers: [
-            { url: process.env.FRONTEND_URL + 'api', description: 'Development server' },
-            { url: process.env.FRONTEND_URL + 'api', description: 'Production server' },
+            {
+                url: process.env.BACKEND_URL,
+                description: 'Current Server',
+            },
         ],
         security: [{ BearerAuth: [] }]
     },
