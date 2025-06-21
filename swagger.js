@@ -1,8 +1,6 @@
-// backend/swagger.js
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
-const schemas = require('./schemas');
-require('dotenv').config();
+require('dotenv').config(); // loads .env
 
 const options = {
     definition: {
@@ -14,13 +12,22 @@ const options = {
         },
         servers: [
             {
-                url: process.env.BACKEND_URL,
+                url: process.env.BACKEND_URL + '/api',
                 description: 'Current Server',
             },
         ],
-        security: [{ BearerAuth: [] }]
+        components: {
+            securitySchemes: {
+                BearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT',
+                },
+            },
+        },
+        security: [{ BearerAuth: [] }],
     },
-    apis: ['./routes/*.js'], // Path to all route files
+    apis: ['./routes/*.js'],
 };
 
 const specs = swaggerJsdoc(options);
