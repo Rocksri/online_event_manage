@@ -35,9 +35,6 @@ backend/
 ├── uploads/
 └── server.js
 
-less
-Copy
-Edit
 
 ## 🧪 API Documentation
 
@@ -56,9 +53,8 @@ BACKEND_URL=https://your-backend.onrender.com
 EMAIL_USER=your_email@example.com
 EMAIL_PASS=your_app_password
 ✅ Run Locally
-bash
-Copy
-Edit
+
+
 cd backend
 npm install
 npm run dev
@@ -69,9 +65,7 @@ Add the same .env variables in Render dashboard
 
 Ensure correct CORS setup:
 
-js
-Copy
-Edit
+
 app.use(cors({
   origin: [process.env.FRONTEND_URL],
   credentials: true,
