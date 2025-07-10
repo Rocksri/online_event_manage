@@ -8,11 +8,13 @@ const setJwtCookie = (res, userId, userRole) => {
     const payload = { user: { id: userId, role: userRole } };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "5d" });
 
-    // Set the cookie
+    // Determine if secure cookie is needed (true in production/HTTPS, false in development/HTTP)
+    const isProduction = process.env.NODE_ENV === 'production';
+
     res.cookie('token', token, {
         httpOnly: true,
-        secure: true,            // Required for cross-site cookie on HTTPS
-        sameSite: 'None',        // Required for cross-site cookie
+        secure: isProduction,    // Set to true only in production (HTTPS)
+        sameSite: isProduction ? 'None' : 'Lax', // Use 'None' for cross-site in production, 'Lax' for dev
         maxAge: 5 * 24 * 60 * 60 * 1000
     });
 };
