@@ -8,20 +8,17 @@ const setJwtCookie = (res, userId, userRole) => {
     const payload = { user: { id: userId, role: userRole } };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "5d" });
 
-    // Determine if secure cookie is needed (true in production/HTTPS, false in development/HTTP)
     const isProduction = process.env.NODE_ENV === 'production';
 
     res.cookie('token', token, {
         httpOnly: true,
-        // 'secure' must be true for cross-site cookies over HTTPS. False for local HTTP.
-        secure: isProduction,
-        // 'sameSite' must be 'None' for cross-site cookies.
-        // Requires 'secure: true' when 'SameSite' is 'None'.
-        // For local development (HTTP), 'Lax' is a safer default.
-        sameSite: isProduction ? 'None' : 'Lax',
-        maxAge: 5 * 24 * 60 * 60 * 1000 // 5 days in milliseconds
+        secure: isProduction,    // True on Render (HTTPS), False on localhost (HTTP)
+        sameSite: isProduction ? 'None' : 'Lax', // 'None' for cross-site in production, 'Lax' for dev
+        maxAge: 5 * 24 * 60 * 60 * 1000 // 5 days
     });
 };
+
+
 // @desc    Register user
 // @route   POST /api/auth/register
 exports.register = async (req, res) => {
