@@ -14,9 +14,7 @@ const setJwtCookie = (res, userId, userRole, req) => {
 
     const isProduction = process.env.NODE_ENV === 'production';
 
-    console.log(`Setting cookie for domain: ${req.get('host')}`);
-    console.log(`Request origin: ${req.get('origin')}`);
-
+    // Simplified cookie options - remove domain specification
     const cookieOptions = {
         httpOnly: true,
         secure: isProduction,
@@ -26,9 +24,10 @@ const setJwtCookie = (res, userId, userRole, req) => {
 
     res.cookie('token', token, cookieOptions);
 
-    console.log('Cookie set with options:', cookieOptions);
+    // Add these headers to ensure cross-origin cookie acceptance
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', req.get('origin') || allowedOrigins[0]);
 };
-
 
 
 // @desc    Register user
@@ -194,5 +193,43 @@ exports.generatePassword = async (req, res) => {
     } catch (err) {
         console.error(err.message);
         res.status(500).send("Server error");
+    }
+};
+
+
+// @desc    Refresh authentication token
+// @route   POST /api/auth/refresh
+exports.refreshToken = async (req, res) => {
+    const token = req.cookies.token;
+
+    if (!token) {
+        return res.status(401).json({ msg: 'No token provided' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.user.id);
+
+        if (!user) {
+            return res.status(404).json({ msg: 'User not found' });
+        }
+
+        // Create new token
+        const payload = { user: { id: user.id, role: user.role } };
+        const newToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "5d" });
+
+        // Set new cookie
+        const isProduction = process.env.NODE_ENV === 'production';
+        res.cookie('token', newToken, {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? 'None' : 'Lax',
+            maxAge: 5 * 24 * 60 * 60 * 1000
+        });
+
+        res.json({ msg: "Token refreshed" });
+    } catch (err) {
+        console.error("Token refresh error:", err);
+        res.status(401).json({ msg: 'Invalid token' });
     }
 };
