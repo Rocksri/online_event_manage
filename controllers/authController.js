@@ -3,22 +3,35 @@ const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
+
+const allowedCookieDomains = [process.env.FRONTEND_URL, process.env.BACKEND_URL];
+
+
 // Helper function to generate and set JWT cookie
-const setJwtCookie = (res, userId, userRole) => {
+const setJwtCookie = (res, userId, userRole ,req) => {
     const payload = { user: { id: userId, role: userRole } };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "5d" });
 
     const isProduction = process.env.NODE_ENV === 'production';
+    const origin = req.get('origin');
 
-    res.cookie('token', token, {
+    const cookieOptions = {
         httpOnly: true,
         secure: isProduction,
         sameSite: isProduction ? 'None' : 'Lax',
-        maxAge: 5 * 24 * 60 * 60 * 1000,
-        domain: isProduction ? '.onrender.com' : undefined
-    });
-};
+        maxAge: 5 * 24 * 60 * 60 * 1000
+    };
 
+    // Only set domain if it matches allowed domains
+    if (isProduction && origin) {
+        const domain = new URL(origin).hostname;
+        if (allowedCookieDomains.some(d => domain.endsWith(d))) {
+            cookieOptions.domain = domain;
+        }
+    }
+
+    res.cookie('token', token, cookieOptions);
+};
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -41,7 +54,7 @@ exports.register = async (req, res) => {
         await user.save();
 
         // Set JWT as an HTTP-only cookie
-        setJwtCookie(res, user.id, user.role);
+        setJwtCookie(res, user.id, user.role, req);
 
         res.status(201).json({ msg: "User registered successfully" });
     } catch (err) {
@@ -67,7 +80,7 @@ exports.login = async (req, res) => {
         }
 
         // Set JWT as an HTTP-only cookie
-        setJwtCookie(res, user.id, user.role);
+        setJwtCookie(res, user.id, user.role, req);
 
         res.json({ msg: "Logged in successfully" }); // No need to send token in JSON response
     } catch (err) {
@@ -86,7 +99,7 @@ exports.logout = async (req, res) => {
             httpOnly: true,
             secure: isProduction,
             sameSite: isProduction ? 'None' : 'Lax',
-            domain: isProduction ? '.onrender.com' : undefined
+            // Removed domain attribute
         });
 
         res.json({ msg: "Logged out successfully" });

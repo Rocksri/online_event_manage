@@ -35,8 +35,8 @@ connectDB();
 const allowedOrigins = [process.env.FRONTEND_URL, process.env.BACKEND_URL];
 
 // Add localhost for development
-if (process.env.NODE_ENV !== 'production') {
-    allowedOrigins.push('http://localhost:3000');
+if (process.env.NODE_ENV === 'development') {
+    allowedOrigins.push('http://localhost:5173');
 }
 
 const corsOptions = {
@@ -44,7 +44,7 @@ const corsOptions = {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
-        if (allowedOrigins.indexOf(origin) !== -1) {
+        if (allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
             console.error(`CORS blocked for origin: ${origin}`);
