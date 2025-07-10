@@ -49,7 +49,7 @@ exports.register = async (req, res) => {
 
         res.status(201).json({ msg: "User registered successfully" }); // or Logged in successfully
     } catch (err) {
-        console.error("Error in authController (register/login):", err); // Catch specific errors here
+        console.error("Error in authController register:", err); // Catch specific errors here
         res.status(500).send("Server error: " + err.message); // Send more specific error message
     }
 }
@@ -75,9 +75,9 @@ exports.login = async (req, res) => {
         setJwtCookie(res, user.id, user.role);
         console.log("JWT cookie setting function called successfully.");
 
-        res.status(201).json({ msg: "User registered successfully" }); // or Logged in successfully
+        res.status(201).json({ msg: "User logged successfully" }); // or Logged in successfully
     } catch (err) {
-        console.error("Error in authController (register/login):", err); // Catch specific errors here
+        console.error("Error in authController login:", err); // Catch specific errors here
         res.status(500).send("Server error: " + err.message); // Send more specific error message
     }
 };
