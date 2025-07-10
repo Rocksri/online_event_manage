@@ -38,16 +38,16 @@ const allowedOrigins = [process.env.FRONTEND_URL, process.env.BACKEND_URL];
 if (process.env.NODE_ENV === 'development') {
     allowedOrigins.push('http://localhost:5173');
 }
-
+// Update CORS configuration
 const corsOptions = {
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
+        console.log(`Incoming request from origin: ${origin}`);
 
-        if (allowedOrigins.includes(origin)) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            console.log(`Origin allowed: ${origin}`);
             callback(null, true);
         } else {
-            console.error(`CORS blocked for origin: ${origin}`);
+            console.log(`CORS blocked for origin: ${origin}`);
             callback(new Error('Not allowed by CORS'));
         }
     },
@@ -57,10 +57,17 @@ const corsOptions = {
     optionsSuccessStatus: 200
 };
 
+
 // Middleware
 app.use(cors(corsOptions)); // Apply CORS middleware
 app.use(express.json());
 app.use(cookieParser()); // Use cookie-parser middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    console.log('Headers:', req.headers);
+    console.log('Cookies:', req.cookies);
+    next();
+});
 swaggerSetup(app);
 
 

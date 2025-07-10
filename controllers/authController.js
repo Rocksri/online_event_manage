@@ -8,12 +8,14 @@ const allowedCookieDomains = [process.env.FRONTEND_URL, process.env.BACKEND_URL]
 
 
 // Helper function to generate and set JWT cookie
-const setJwtCookie = (res, userId, userRole ,req) => {
+const setJwtCookie = (res, userId, userRole, req) => {
     const payload = { user: { id: userId, role: userRole } };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "5d" });
 
     const isProduction = process.env.NODE_ENV === 'production';
-    const origin = req.get('origin');
+
+    console.log(`Setting cookie for domain: ${req.get('host')}`);
+    console.log(`Request origin: ${req.get('origin')}`);
 
     const cookieOptions = {
         httpOnly: true,
@@ -22,16 +24,12 @@ const setJwtCookie = (res, userId, userRole ,req) => {
         maxAge: 5 * 24 * 60 * 60 * 1000
     };
 
-    // Only set domain if it matches allowed domains
-    if (isProduction && origin) {
-        const domain = new URL(origin).hostname;
-        if (allowedCookieDomains.some(d => domain.endsWith(d))) {
-            cookieOptions.domain = domain;
-        }
-    }
-
     res.cookie('token', token, cookieOptions);
+
+    console.log('Cookie set with options:', cookieOptions);
 };
+
+
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -67,6 +65,7 @@ exports.register = async (req, res) => {
 // @route   POST /api/auth/login
 exports.login = async (req, res) => {
     const { email, password } = req.body;
+    console.log('Login request from origin:', req.get('origin'));
 
     try {
         const user = await User.findOne({ email });
@@ -79,12 +78,12 @@ exports.login = async (req, res) => {
             return res.status(400).json({ msg: "Invalid credentials" });
         }
 
-        // Set JWT as an HTTP-only cookie
         setJwtCookie(res, user.id, user.role, req);
+        console.log('Login successful for user:', user.email);
 
-        res.json({ msg: "Logged in successfully" }); // No need to send token in JSON response
+        res.json({ msg: "Logged in successfully" });
     } catch (err) {
-        console.error(err.message);
+        console.error("Login error:", err.message);
         res.status(500).send("Server error");
     }
 };
