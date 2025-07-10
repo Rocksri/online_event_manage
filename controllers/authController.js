@@ -13,12 +13,15 @@ const setJwtCookie = (res, userId, userRole) => {
 
     res.cookie('token', token, {
         httpOnly: true,
-        secure: isProduction,    // Set to true only in production (HTTPS)
-        sameSite: isProduction ? 'None' : 'Lax', // Use 'None' for cross-site in production, 'Lax' for dev
-        maxAge: 5 * 24 * 60 * 60 * 1000
+        // 'secure' must be true for cross-site cookies over HTTPS. False for local HTTP.
+        secure: isProduction,
+        // 'sameSite' must be 'None' for cross-site cookies.
+        // Requires 'secure: true' when 'SameSite' is 'None'.
+        // For local development (HTTP), 'Lax' is a safer default.
+        sameSite: isProduction ? 'None' : 'Lax',
+        maxAge: 5 * 24 * 60 * 60 * 1000 // 5 days in milliseconds
     });
 };
-
 // @desc    Register user
 // @route   POST /api/auth/register
 exports.register = async (req, res) => {
@@ -40,14 +43,16 @@ exports.register = async (req, res) => {
         await user.save();
 
         // Set JWT as an HTTP-only cookie
+        console.log("Attempting to set JWT cookie for user:", user.id);
         setJwtCookie(res, user.id, user.role);
+        console.log("JWT cookie setting function called successfully.");
 
-        res.status(201).json({ msg: "User registered successfully" });
+        res.status(201).json({ msg: "User registered successfully" }); // or Logged in successfully
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Server error");
+        console.error("Error in authController (register/login):", err); // Catch specific errors here
+        res.status(500).send("Server error: " + err.message); // Send more specific error message
     }
-};
+}
 
 // @desc    Login user
 // @route   POST /api/auth/login
@@ -66,12 +71,14 @@ exports.login = async (req, res) => {
         }
 
         // Set JWT as an HTTP-only cookie
+        console.log("Attempting to set JWT cookie for user:", user.id);
         setJwtCookie(res, user.id, user.role);
+        console.log("JWT cookie setting function called successfully.");
 
-        res.json({ msg: "Logged in successfully" }); // No need to send token in JSON response
+        res.status(201).json({ msg: "User registered successfully" }); // or Logged in successfully
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Server error");
+        console.error("Error in authController (register/login):", err); // Catch specific errors here
+        res.status(500).send("Server error: " + err.message); // Send more specific error message
     }
 };
 
