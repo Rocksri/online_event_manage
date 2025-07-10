@@ -8,12 +8,14 @@ const setJwtCookie = (res, userId, userRole) => {
     const payload = { user: { id: userId, role: userRole } };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "5d" });
 
-    // Dynamic cookie settings based on environment
+    const isProduction = process.env.NODE_ENV === 'production';
+
     res.cookie('token', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // Only secure in production
-        sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
-        maxAge: 5 * 24 * 60 * 60 * 1000
+        secure: isProduction,
+        sameSite: isProduction ? 'None' : 'Lax',
+        maxAge: 5 * 24 * 60 * 60 * 1000,
+        domain: isProduction ? '.onrender.com' : undefined
     });
 };
 
@@ -78,11 +80,15 @@ exports.login = async (req, res) => {
 // @route   POST /api/auth/logout
 exports.logout = async (req, res) => {
     try {
+        const isProduction = process.env.NODE_ENV === 'production';
+
         res.clearCookie('token', {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax'
+            secure: isProduction,
+            sameSite: isProduction ? 'None' : 'Lax',
+            domain: isProduction ? '.onrender.com' : undefined
         });
+
         res.json({ msg: "Logged out successfully" });
     } catch (err) {
         console.error("Logout error:", err);
