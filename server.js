@@ -33,19 +33,9 @@ connectDB();
 
 // CORS Configuration
 const corsOptions = {
-    origin: (origin, callback) => {
-        const allowedOrigins = [process.env.FRONTEND_URL, process.env.BACKEND_URL];
-
-        // Allow requests with no origin (like mobile apps, curl requests)
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            console.error(`CORS blocked for origin: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
+    origin: [process.env.FRONTEND_URL, process.env.BACKEND_URL],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
     optionsSuccessStatus: 200
 };

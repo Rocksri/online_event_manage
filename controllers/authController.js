@@ -8,13 +8,12 @@ const setJwtCookie = (res, userId, userRole) => {
     const payload = { user: { id: userId, role: userRole } };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "5d" });
 
-    const isProduction = process.env.NODE_ENV === 'production';
-
+    // Dynamic cookie settings based on environment
     res.cookie('token', token, {
         httpOnly: true,
-        secure: isProduction,    // True on Render (HTTPS), False on localhost (HTTP)
-        sameSite: isProduction ? 'None' : 'Lax', // 'None' for cross-site in production, 'Lax' for dev
-        maxAge: 5 * 24 * 60 * 60 * 1000 // 5 days
+        secure: process.env.NODE_ENV === 'production', // Only secure in production
+        sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+        maxAge: 5 * 24 * 60 * 60 * 1000
     });
 };
 
@@ -40,16 +39,14 @@ exports.register = async (req, res) => {
         await user.save();
 
         // Set JWT as an HTTP-only cookie
-        console.log("Attempting to set JWT cookie for user:", user.id);
         setJwtCookie(res, user.id, user.role);
-        console.log("JWT cookie setting function called successfully.");
 
-        res.status(201).json({ msg: "User registered successfully" }); // or Logged in successfully
+        res.status(201).json({ msg: "User registered successfully" });
     } catch (err) {
-        console.error("Error in authController register:", err); // Catch specific errors here
-        res.status(500).send("Server error: " + err.message); // Send more specific error message
+        console.error(err.message);
+        res.status(500).send("Server error");
     }
-}
+};
 
 // @desc    Login user
 // @route   POST /api/auth/login
@@ -68,14 +65,12 @@ exports.login = async (req, res) => {
         }
 
         // Set JWT as an HTTP-only cookie
-        console.log("Attempting to set JWT cookie for user:", user.id);
         setJwtCookie(res, user.id, user.role);
-        console.log("JWT cookie setting function called successfully.");
 
-        res.status(201).json({ msg: "User logged successfully" }); // or Logged in successfully
+        res.json({ msg: "Logged in successfully" }); // No need to send token in JSON response
     } catch (err) {
-        console.error("Error in authController login:", err); // Catch specific errors here
-        res.status(500).send("Server error: " + err.message); // Send more specific error message
+        console.error(err.message);
+        res.status(500).send("Server error");
     }
 };
 
@@ -83,11 +78,10 @@ exports.login = async (req, res) => {
 // @route   POST /api/auth/logout
 exports.logout = async (req, res) => {
     try {
-        // Clear the 'token' cookie
         res.clearCookie('token', {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'Lax'
+            sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax'
         });
         res.json({ msg: "Logged out successfully" });
     } catch (err) {
