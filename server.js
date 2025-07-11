@@ -52,7 +52,12 @@ const corsOptions = {
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'Cache-Control',  // Add this
+        'Pragma'          // Add this
+    ],
     credentials: true,
     optionsSuccessStatus: 200
 };
@@ -64,8 +69,6 @@ app.use(express.json());
 app.use(cookieParser()); // Use cookie-parser middleware
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-    console.log('Headers:', req.headers);
-    console.log('Cookies:', req.cookies);
     next();
 });
 swaggerSetup(app);
