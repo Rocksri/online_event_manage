@@ -225,7 +225,5 @@ router.put("/password", auth, authController.updatePassword);
  */
 router.post("/generate-password", authController.generatePassword);
 
-router.post("/refresh", authController.refreshToken);
-
 
 module.exports = router;
