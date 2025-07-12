@@ -20,14 +20,16 @@ const setJwtCookie = (res, userId, userRole, req) => {
         secure: isProduction,
         sameSite: isSameSite,
         maxAge: 5 * 24 * 60 * 60 * 1000,
+        domain: domain,
+        partitioned: true // Add Partitioned attribute
     };
 
     res.cookie('token', token, cookieOptions);
-    // Add these headers for cross-domain cookies
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', req.get('origin') || allowedOrigins[0]);
-};
 
+    // Add CORS headers
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', req.get('origin') || process.env.FRONTEND_URL);
+};
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -101,7 +103,7 @@ exports.logout = async (req, res) => {
         // Add CORS headers
         res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Access-Control-Allow-Origin', req.get('origin') || allowedOrigins[0]);
-        
+
         res.json({ msg: "Logged out successfully" });
     } catch (err) {
         console.error("Logout error:", err);
