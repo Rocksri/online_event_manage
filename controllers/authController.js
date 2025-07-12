@@ -5,30 +5,22 @@ const bcrypt = require("bcryptjs");
 
 
 // Helper function to generate and set JWT cookie
-const setJwtCookie = (res, userId, userRole, req) => {
+const setJwtCookie = (res, userId, userRole) => {
     const payload = { user: { id: userId, role: userRole } };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "5d" });
 
     const isProduction = process.env.NODE_ENV === 'production';
-
-    // Get the actual request origin
-    const requestOrigin = req.get('origin') || process.env.FRONTEND_URL;
-    const originDomain = new URL(requestOrigin).hostname;
 
     const cookieOptions = {
         httpOnly: true,
         secure: isProduction,
         sameSite: isProduction ? 'None' : 'Lax',
         maxAge: 5 * 24 * 60 * 60 * 1000,
-        domain: isProduction ? originDomain : undefined,
-        partitioned: true // Add Partitioned attribute
+        partitioned: true
+        // REMOVED domain attribute
     };
 
     res.cookie('token', token, cookieOptions);
-
-    // Add CORS headers
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
 };
 
 // @desc    Register user
@@ -52,7 +44,7 @@ exports.register = async (req, res) => {
         await user.save();
 
         // Set JWT as an HTTP-only cookie
-        setJwtCookie(res, user.id, user.role, req);
+        setJwtCookie(res, userId, userRole);
 
         res.status(201).json({ msg: "User registered successfully" });
     } catch (err) {
@@ -78,7 +70,7 @@ exports.login = async (req, res) => {
             return res.status(400).json({ msg: "Invalid credentials" });
         }
 
-        setJwtCookie(res, user.id, user.role, req);
+        setJwtCookie(res, userId, userRole);
         console.log('Login successful for user:', user.email);
 
         res.json({ msg: "Logged in successfully" });
@@ -98,7 +90,6 @@ exports.logout = async (req, res) => {
             httpOnly: true,
             secure: isProduction,
             sameSite: isProduction ? 'None' : 'Lax',
-            // Removed domain attribute
         });
         // Add CORS headers
         res.setHeader('Access-Control-Allow-Credentials', 'true');
