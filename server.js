@@ -32,18 +32,19 @@ const app = express();
 connectDB();
 
 // CORS Configuration
-const allowedOrigins = [process.env.FRONTEND_URL, process.env.BACKEND_URL];
-
-// Add localhost for development
-if (process.env.NODE_ENV === 'development') {
-    allowedOrigins.push('http://localhost:5173');
-}
-// Update CORS configuration
 const corsOptions = {
     origin: function (origin, callback) {
         console.log(`Incoming request from origin: ${origin}`);
+        const allowedOrigins = [
+            process.env.FRONTEND_URL,
+            process.env.BACKEND_URL,
+        ];
 
-        if (!origin || allowedOrigins.includes(origin)) {
+        if (process.env.NODE_ENV === 'development') {
+            allowedOrigins.push('http://localhost:5173');
+        }
+
+        if (!origin || allowedOrigins.some(allowed => origin.includes(allowed))) {
             console.log(`Origin allowed: ${origin}`);
             callback(null, true);
         } else {
@@ -57,13 +58,12 @@ const corsOptions = {
         'Authorization',
         'Cache-Control',
         'Pragma',
-        'x-requested-with' // Add this
+        'x-requested-with'
     ],
-    exposedHeaders: ['set-cookie'], // Add this
+    exposedHeaders: ['set-cookie'],
     credentials: true,
     optionsSuccessStatus: 200
 };
-
 
 // Middleware
 app.use(cors(corsOptions)); // Apply CORS middleware

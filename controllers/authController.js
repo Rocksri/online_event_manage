@@ -10,17 +10,17 @@ const setJwtCookie = (res, userId, userRole, req) => {
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "5d" });
 
     const isProduction = process.env.NODE_ENV === 'production';
-    const isSameSite = isProduction ? 'None' : 'Lax';
 
-    // Use frontend domain in production
-    const domain = isProduction ? new URL(process.env.FRONTEND_URL).hostname : undefined;
+    // Get the actual request origin
+    const requestOrigin = req.get('origin') || process.env.FRONTEND_URL;
+    const originDomain = new URL(requestOrigin).hostname;
 
     const cookieOptions = {
         httpOnly: true,
         secure: isProduction,
-        sameSite: isSameSite,
+        sameSite: isProduction ? 'None' : 'Lax',
         maxAge: 5 * 24 * 60 * 60 * 1000,
-        domain: domain,
+        domain: isProduction ? originDomain : undefined,
         partitioned: true // Add Partitioned attribute
     };
 
@@ -28,7 +28,7 @@ const setJwtCookie = (res, userId, userRole, req) => {
 
     // Add CORS headers
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', req.get('origin') || process.env.FRONTEND_URL);
+    res.setHeader('Access-Control-Allow-Origin', requestOrigin);
 };
 
 // @desc    Register user
