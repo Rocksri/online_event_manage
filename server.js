@@ -40,11 +40,7 @@ const corsOptions = {
             process.env.BACKEND_URL,
         ];
 
-        if (process.env.NODE_ENV === 'development') {
-            allowedOrigins.push('http://localhost:5173');
-        }
-
-        if (!origin || allowedOrigins.some(allowed => origin.includes(allowed))) {
+        if (!origin || allowedOrigins.includes(origin)) {
             console.log(`Origin allowed: ${origin}`);
             callback(null, true);
         } else {
