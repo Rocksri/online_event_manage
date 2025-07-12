@@ -20,10 +20,12 @@ const setJwtCookie = (res, userId, userRole, req) => {
         secure: isProduction,
         sameSite: isSameSite,
         maxAge: 5 * 24 * 60 * 60 * 1000,
-        domain: domain  // Set domain only in production
     };
 
     res.cookie('token', token, cookieOptions);
+    // Add these headers for cross-domain cookies
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', req.get('origin') || allowedOrigins[0]);
 };
 
 
@@ -96,7 +98,10 @@ exports.logout = async (req, res) => {
             sameSite: isProduction ? 'None' : 'Lax',
             // Removed domain attribute
         });
-
+        // Add CORS headers
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Origin', req.get('origin') || allowedOrigins[0]);
+        
         res.json({ msg: "Logged out successfully" });
     } catch (err) {
         console.error("Logout error:", err);

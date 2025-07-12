@@ -55,9 +55,11 @@ const corsOptions = {
     allowedHeaders: [
         'Content-Type',
         'Authorization',
-        'Cache-Control',  // Add this
-        'Pragma'          // Add this
+        'Cache-Control',
+        'Pragma',
+        'x-requested-with' // Add this
     ],
+    exposedHeaders: ['set-cookie'], // Add this
     credentials: true,
     optionsSuccessStatus: 200
 };
