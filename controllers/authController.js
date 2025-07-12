@@ -44,7 +44,7 @@ exports.register = async (req, res) => {
         await user.save();
 
         // Set JWT as an HTTP-only cookie
-        setJwtCookie(res, userId, userRole);
+        setJwtCookie(res, user.id, user.role);
 
         res.status(201).json({ msg: "User registered successfully" });
     } catch (err) {
@@ -70,7 +70,7 @@ exports.login = async (req, res) => {
             return res.status(400).json({ msg: "Invalid credentials" });
         }
 
-        setJwtCookie(res, userId, userRole);
+        setJwtCookie(res, user.id, user.role);
         console.log('Login successful for user:', user.email);
 
         res.json({ msg: "Logged in successfully" });
